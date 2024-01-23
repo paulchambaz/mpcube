@@ -15,3 +15,6 @@ build:
 
 test:
   cargo test
+
+coverage:
+  cargo tarpaulin

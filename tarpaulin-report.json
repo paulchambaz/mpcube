@@ -1,0 +1,1 @@
+{"files":[{"path":["/","home","paul","dev","rust","mpcube","src","main.rs"],"content":"fn main() {\n    println!(\"Hello, world!\");\n}\n","traces":[{"line":1,"address":[128816,128864,128865],"length":1,"stats":{"Line":2},"fn_name":"main"},{"line":2,"address":[128820],"length":1,"stats":{"Line":0},"fn_name":null}],"covered":1,"coverable":2}]}
