@@ -18,3 +18,6 @@ test:
 
 coverage:
   cargo tarpaulin
+
+fmt:
+  cargo fmt
