@@ -27,14 +27,8 @@ impl AlbumWindow {
             offset: 0,
             album_playing: None,
             album_selected: 0,
-            album_names: vec![
-            ],
-            area: Rect {
-                x: 0,
-                y: 0,
-                width: 0,
-                height: 0,
-            },
+            album_names: vec![],
+            area: Rect::new(0, 0, 0, 0),
         }
     }
 
@@ -47,18 +41,10 @@ impl AlbumWindow {
     }
 
     pub fn update_area(&mut self, x: u16, y: u16, width: u16, height: u16) {
-        if self.area.x != x {
-            self.area.x = x;
-        }
-        if self.area.y != y {
-            self.area.y = y;
-        }
-        if self.area.width != width {
-            self.area.width = width;
-        }
-        if self.area.height != height {
-            self.area.height = height;
-        }
+        self.area.x = x;
+        self.area.y = y;
+        self.area.width = width;
+        self.area.height = height;
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
@@ -71,7 +57,7 @@ impl AlbumWindow {
                     .fg(if self.selected {
                         Color::LightRed
                     } else {
-                        Color::White
+                        Color::Gray
                     })
                     .add_modifier(if self.selected {
                         Modifier::BOLD
@@ -106,7 +92,7 @@ impl AlbumWindow {
                 } else if i == self.album_selected {
                     Style::default().fg(Color::Black).bg(Color::LightBlue)
                 } else {
-                    Style::default()
+                    Style::default().fg(Color::Gray)
                 }
             } else if i == self.album_selected {
                 Style::default().fg(Color::Black).bg(Color::LightBlue)
@@ -138,7 +124,6 @@ impl AlbumWindow {
             self.album_selected += 1;
         }
 
-        // when do we want it to update
         if self.album_selected > self.area.height as usize - 3 - Self::BORDER
             && self.offset < self.album_names.len() - self.area.height as usize + 2
         {

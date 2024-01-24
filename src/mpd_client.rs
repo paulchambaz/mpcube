@@ -1,4 +1,8 @@
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
+use bincode;
+use std::fs::File;
+use std::io::{self, Read, Write};
 
 pub struct Client {
     pub client: mpd::Client,
@@ -16,12 +20,12 @@ pub struct StateData {
     pub repeat: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MusicData {
     pub albums: Vec<Album>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Album {
     pub artist: String,
     pub album: String,
@@ -29,7 +33,7 @@ pub struct Album {
     pub songs: Vec<Song>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Song {
     pub id: String,
     pub title: String,
@@ -70,6 +74,21 @@ impl Album {
 }
 
 impl MusicData {
+    // i need to add the path for this function
+    fn from_cache(path: &str) -> MusicData {
+        let mut file = File::open(path).expect("Could not load cache");
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer).expect("Could not read file");
+        bincode::deserialize(&buffer[..]).expect("Deserialization failed")
+    }
+
+    // i need to add the path for this function
+    fn save_cache(&mut self, path: &str) {
+        let serialized_data = bincode::serialize(self).expect("Serialization failed");
+        let mut file = File::create(path).expect("Could not save create cache file");
+        file.write_all(&serialized_data).expect("Could not save cache");
+    }
+
     fn from_raw(raw_music_data: RawMusicData) -> MusicData {
         let mut albums = Vec::new();
         let mut current_album: Option<Album> = None;
@@ -154,6 +173,7 @@ impl RawMusicData {
 
         let mut out = Vec::new();
 
+        let start = Instant::now();
         for song in songs {
             let id = song.file.clone();
 
@@ -216,9 +236,17 @@ impl RawMusicData {
             });
         }
 
+        // it might be worth caching if it is this slow
+        println!("{}", out.len());
+        let duration = start.elapsed();
+        println!("Time: {} µs", duration.as_micros());
+
         RawMusicData { entries: out }
     }
 }
+
+
+use std::time::Instant;
 
 impl Client {
     pub fn new(address: &str, port: u16) -> Client {
@@ -231,10 +259,23 @@ impl Client {
         }
     }
 
-    pub fn full_sync(&mut self) {
+    pub fn init_sync(&mut self, cache_path: &str) {
+        if std::path::Path::new(cache_path).exists() {
+            let music_data = MusicData::from_cache(cache_path);
+            self.data = Some(music_data);
+            self.sync_state();
+        } else {
+            self.full_sync(cache_path);
+        }
+    }
+
+    pub fn full_sync(&mut self, cache_path: &str) {
         let raw_music_data = RawMusicData::from_client(&mut self.client);
         let mut music_data = MusicData::from_raw(raw_music_data);
+
         music_data.sort();
+
+        music_data.save_cache(cache_path);
         self.data = Some(music_data);
         self.sync_state();
     }
@@ -243,11 +284,11 @@ impl Client {
         // TODO: implement proper status update
         self.state = Some(StateData {
             playing: false,
-            id: Some(0),
+            id: None,
             duration: None,
             volume: 0,
             shuffle: false,
-            repeat: false,
+            repeat: true,
         });
     }
 

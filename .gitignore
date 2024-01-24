@@ -3,3 +3,4 @@
 /.direnv
 *.profraw
 tarpaulin*
+*.bin
