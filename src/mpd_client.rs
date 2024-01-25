@@ -1,8 +1,9 @@
+use mpd::State;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use bincode;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
+use std::time::Duration;
 
 pub struct Client {
     pub client: mpd::Client,
@@ -13,9 +14,10 @@ pub struct Client {
 #[derive(Debug)]
 pub struct StateData {
     pub playing: bool,
-    pub id: Option<usize>,
-    pub duration: Option<u32>,
-    pub volume: u32,
+    pub album_id: Option<usize>,
+    pub title_id: Option<usize>,
+    pub position: Option<Duration>,
+    pub volume: i8,
     pub shuffle: bool,
     pub repeat: bool,
 }
@@ -35,10 +37,10 @@ pub struct Album {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Song {
-    pub id: String,
+    pub uri: String,
     pub title: String,
     pub track: u32,
-    pub duration: u32,
+    pub duration: Duration,
 }
 
 #[derive(Debug)]
@@ -48,16 +50,48 @@ struct RawMusicData {
 
 #[derive(Debug)]
 struct RawMusicEntry {
-    id: String,
+    uri: String,
     title: String,
     artist: String,
     album: String,
     date: i32,
     track: u32,
-    duration: u32,
+    duration: Duration,
 }
 
 impl Album {
+    pub fn cmp(a: &Album, b: &Album) -> std::cmp::Ordering {
+        // Handle empty or missing artist names
+        match (a.artist.is_empty(), b.artist.is_empty()) {
+            (true, false) => return std::cmp::Ordering::Less,
+            (false, true) => return std::cmp::Ordering::Greater,
+            _ => {}
+        };
+
+        // Skip "The " at the beginning of artist names
+        let a_artist = a.artist.strip_prefix("The ").unwrap_or(&a.artist);
+        let b_artist = b.artist.strip_prefix("The ").unwrap_or(&b.artist);
+
+        // Compare by artist
+        match a_artist.cmp(b_artist) {
+            std::cmp::Ordering::Equal => {}
+            non_eq => return non_eq,
+        }
+
+        // Compare by date
+        match a.date.cmp(&b.date) {
+            std::cmp::Ordering::Equal => {}
+            non_eq => return non_eq,
+        }
+
+        // Handle empty or missing album names
+        match (a.album.is_empty(), b.album.is_empty()) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.album.cmp(&b.album), // Compare by album
+        }
+    }
+
     pub fn sort(&mut self) {
         self.songs.sort_by(|a, b| {
             // Use track number to order
@@ -67,9 +101,87 @@ impl Album {
                 std::cmp::Ordering::Equal => {}
             };
 
-            // Handle equal track id by using id
-            a.id.cmp(&b.id)
+            // Handle equal track uri by using uri
+            a.uri.cmp(&b.uri)
         });
+    }
+}
+
+impl StateData {
+    pub fn update_status(&mut self, client: &mut mpd::Client) {
+        let status = client.status().expect("Could not connect to mpd");
+        self.playing = status.state == State::Play;
+        self.position = status.elapsed;
+        self.volume = status.volume;
+        self.shuffle = status.random;
+        self.repeat = status.repeat;
+    }
+
+    pub fn update_song(&mut self, client: &mut mpd::Client, music_data: &MusicData) {
+        let song = client.currentsong();
+        let id: Option<(usize, usize)> = if let Ok(Some(song)) = song {
+            let album_opt = song
+                .tags
+                .iter()
+                .find(|(key, _value)| key == "ALBUM" || key == "Album");
+
+            if let Some((_key, album)) = album_opt {
+                let album = album.to_string(); // Convert &String to String
+                let uri = song.file.to_string(); // Convert &String to String
+                music_data.find(album, uri)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let (album_id, title_id) = if let Some((album_id, title_id)) = id {
+            (Some(album_id), Some(title_id))
+        } else {
+            (None, None)
+        };
+
+        self.album_id = album_id;
+        self.title_id = title_id;
+    }
+
+    pub fn from_client(client: &mut mpd::Client, music_data: &MusicData) -> StateData {
+        let status = client.status().expect("Could not connect to mpd");
+        let song = client.currentsong();
+
+        let id: Option<(usize, usize)> = if let Ok(Some(song)) = song {
+            let album_opt = song
+                .tags
+                .iter()
+                .find(|(key, _value)| key == "ALBUM" || key == "Album");
+
+            if let Some((_key, album)) = album_opt {
+                let album = album.to_string(); // Convert &String to String
+                let uri = song.file.to_string(); // Convert &String to String
+                music_data.find(album, uri)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let (album_id, title_id) = if let Some((album_id, title_id)) = id {
+            (Some(album_id), Some(title_id))
+        } else {
+            (None, None)
+        };
+
+        StateData {
+            playing: status.state == State::Play,
+            album_id,
+            title_id,
+            position: status.elapsed,
+            volume: status.volume,
+            shuffle: status.random,
+            repeat: status.repeat,
+        }
     }
 }
 
@@ -86,7 +198,8 @@ impl MusicData {
     fn save_cache(&mut self, path: &str) {
         let serialized_data = bincode::serialize(self).expect("Serialization failed");
         let mut file = File::create(path).expect("Could not save create cache file");
-        file.write_all(&serialized_data).expect("Could not save cache");
+        file.write_all(&serialized_data)
+            .expect("Could not save cache");
     }
 
     fn from_raw(raw_music_data: RawMusicData) -> MusicData {
@@ -97,7 +210,7 @@ impl MusicData {
             match current_album.as_mut() {
                 Some(album) if album.album == entry.album => {
                     album.songs.push(Song {
-                        id: entry.id,
+                        uri: entry.uri,
                         title: entry.title,
                         track: entry.track,
                         duration: entry.duration,
@@ -112,7 +225,7 @@ impl MusicData {
                         album: entry.album,
                         date: entry.date,
                         songs: vec![Song {
-                            id: entry.id,
+                            uri: entry.uri,
                             title: entry.title,
                             track: entry.track,
                             duration: entry.duration,
@@ -130,40 +243,23 @@ impl MusicData {
     }
 
     pub fn sort(&mut self) {
-        self.albums.sort_by(|a, b| {
-            // Handle empty or missing artist names
-            match (a.artist.is_empty(), b.artist.is_empty()) {
-                (true, false) => return std::cmp::Ordering::Less,
-                (false, true) => return std::cmp::Ordering::Greater,
-                _ => {}
-            };
-
-            // Skip "The " at the beginning of artist names
-            let a_artist = a.artist.strip_prefix("The ").unwrap_or(&a.artist);
-            let b_artist = b.artist.strip_prefix("The ").unwrap_or(&b.artist);
-
-            // Compare by artist
-            match a_artist.cmp(b_artist) {
-                std::cmp::Ordering::Equal => {}
-                non_eq => return non_eq,
-            }
-
-            // Compare by date
-            match a.date.cmp(&b.date) {
-                std::cmp::Ordering::Equal => {}
-                non_eq => return non_eq,
-            }
-
-            // Handle empty or missing album names
-            match (a.album.is_empty(), b.album.is_empty()) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.album.cmp(&b.album), // Compare by album
-            }
-        });
+        self.albums.sort_by(Album::cmp);
         for album in self.albums.iter_mut() {
             album.sort();
         }
+    }
+
+    pub fn find(&self, album_title: String, uri: String) -> Option<(usize, usize)> {
+        for (album_idx, album) in self.albums.iter().enumerate() {
+            if album.album == album_title {
+                if let Some(title_idx) = album.songs.iter().position(|song| song.uri == uri) {
+                    return Some((album_idx, title_idx));
+                } else {
+                    return None;
+                }
+            }
+        }
+        None
     }
 }
 
@@ -173,27 +269,28 @@ impl RawMusicData {
 
         let mut out = Vec::new();
 
-        let start = Instant::now();
         for song in songs {
-            let id = song.file.clone();
+            let uri = song.file.clone();
+            println!("Song: {:?}", song);
+
+            // let full_song = client.find("file", uri).expect("Could not fetch song details");
 
             let tags: HashMap<_, _> = client
-                .readcomments(song)
+                .readcomments(song.clone())
                 .expect("Could not read comments from song")
                 .flatten()
                 .collect();
+            println!("Tags: {:?}", tags);
 
-            // println!("{:?}", tags);
-
+            // TODO: i dont think i have to use unwrap or else and or_else just or and unwrap_or
             let title = tags
                 .get("TITLE")
                 .or_else(|| tags.get("title"))
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| id.clone());
+                .unwrap_or_else(|| uri.clone());
 
             let artist = tags
-                .get("ALBUMARTIST")
-                .or_else(|| tags.get("ARTIST"))
+                .get("ARTIST")
                 .or_else(|| tags.get("artist"))
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| "Unknown Artist".to_string());
@@ -222,11 +319,16 @@ impl RawMusicData {
                 .and_then(|s| s.parse::<u32>().ok())
                 .unwrap_or(0);
 
+            let duration = Duration::new(0, 0);
             // TODO: implement getting the actual duration of the song
-            let duration = 215535;
+            // let duration = Duration::new(0, 0);
+            // let duration = song.duration;
+            // println!("Title: {:?}", title);
+            // println!("Duration: {:?}", duration);
+            // println!();
 
             out.push(RawMusicEntry {
-                id,
+                uri,
                 title,
                 artist,
                 album,
@@ -236,17 +338,9 @@ impl RawMusicData {
             });
         }
 
-        // it might be worth caching if it is this slow
-        println!("{}", out.len());
-        let duration = start.elapsed();
-        println!("Time: {} µs", duration.as_micros());
-
         RawMusicData { entries: out }
     }
 }
-
-
-use std::time::Instant;
 
 impl Client {
     pub fn new(address: &str, port: u16) -> Client {
@@ -281,24 +375,19 @@ impl Client {
     }
 
     pub fn sync_state(&mut self) {
-        // TODO: implement proper status update
-        self.state = Some(StateData {
-            playing: false,
-            id: None,
-            duration: None,
-            volume: 0,
-            shuffle: false,
-            repeat: true,
-        });
+        if let Some(data) = &self.data {
+            let state_data = StateData::from_client(&mut self.client, data);
+            self.state = Some(state_data);
+        }
     }
 
-    pub fn start_album(&mut self, album_id: u32) {
+    pub fn start_album(&mut self, album_id: usize) {
         // clear music playing
         // add all the songs from the album to the queue
         // start playing
     }
 
-    pub fn start_title(&mut self, album_id: u32, title_id: u32) {
+    pub fn start_title(&mut self, album_id: usize, title_id: usize) {
         // clear music playing
         // add all the songs from the album to the queue
         // start playing
@@ -306,7 +395,11 @@ impl Client {
     }
 
     pub fn toggle(&mut self) {
-        // if playing { pause } else { play }
+        if let Some(state) = &mut self.state {
+            if self.client.toggle_pause().is_ok() {
+                state.update_status(&mut self.client);
+            }
+        }
     }
 
     pub fn next(&mut self) {
@@ -318,19 +411,37 @@ impl Client {
     }
 
     pub fn volume_up(&mut self) {
-        // if playing { volume_up }
+        if let Some(state) = &mut self.state {
+            let new_volume = i8::min(100, state.volume + 10);
+            if self.client.volume(new_volume).is_ok() {
+                state.update_status(&mut self.client);
+            }
+        }
     }
 
     pub fn volume_down(&mut self) {
-        // if playing { volume_down }
+        if let Some(state) = &mut self.state {
+            let new_volume = i8::max(0, state.volume - 10);
+            if self.client.volume(new_volume).is_ok() {
+                state.update_status(&mut self.client);
+            }
+        }
     }
 
     pub fn shuffle(&mut self) {
-        // run_random shuffle
+        if let Some(state) = &mut self.state {
+            if self.client.random(!state.shuffle).is_ok() {
+                state.update_status(&mut self.client);
+            }
+        }
     }
 
     pub fn repeat(&mut self) {
-        // run_repeat repeat
+        if let Some(state) = &mut self.state {
+            if self.client.repeat(!state.repeat).is_ok() {
+                state.update_status(&mut self.client);
+            }
+        }
     }
 
     pub fn clear(&mut self) {

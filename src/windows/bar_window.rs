@@ -1,10 +1,4 @@
-use ratatui::{
-    layout::Rect,
-    prelude::{CrosstermBackend, Stylize, Terminal},
-    style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph},
-    Frame,
-};
+use ratatui::{layout::Rect, prelude::Stylize, style::Color, widgets::Paragraph, Frame};
 
 use crate::mpd_client::{MusicData, StateData};
 
@@ -19,8 +13,7 @@ impl BarWindow {
         }
     }
 
-    pub fn update(&mut self, music_data: &MusicData, state_data: &StateData) {
-    }
+    pub fn update(&mut self, _: bool, _: &MusicData, _: &StateData) {}
 
     pub fn update_area(&mut self, x: u16, y: u16, width: u16, height: u16) {
         self.area.x = x;
@@ -30,10 +23,21 @@ impl BarWindow {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
+        let a = self.area;
         frame.render_widget(
-            Paragraph::new("Bar")
-                .white()
-                .on_green(),
-            self.area);
+            Paragraph::new("00:00").fg(Color::DarkGray),
+            Rect::new(a.x + 1, a.y, 5, 1),
+        );
+        frame.render_widget(
+            Paragraph::new("00:00").fg(Color::DarkGray),
+            Rect::new(a.x + a.width - 5, a.y, 5, 1),
+        );
+        let volume_bar_width = a.width - 13;
+        for i in 0..volume_bar_width {
+            frame.render_widget(
+                Paragraph::new("─").fg(Color::DarkGray),
+                Rect::new(a.x + 7 + i, a.y, 1, 1),
+            );
+        }
     }
 }

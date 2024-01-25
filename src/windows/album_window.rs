@@ -11,7 +11,7 @@ pub struct AlbumWindow {
     selected: bool,
     offset: usize,
     album_playing: Option<usize>,
-    album_selected: usize,
+    pub album_selected: usize,
     album_names: Vec<String>,
     area: Rect,
 }
@@ -32,12 +32,13 @@ impl AlbumWindow {
         }
     }
 
-    pub fn update(&mut self, music_data: &MusicData, state_data: &StateData) {
+    pub fn update(&mut self, on_album: bool, music_data: &MusicData, state_data: &StateData) {
+        self.selected = on_album;
         self.album_names.clear();
         for album in &music_data.albums {
             self.album_names.push(album.album.clone());
         }
-        self.album_playing = state_data.id;
+        self.album_playing = state_data.album_id;
     }
 
     pub fn update_area(&mut self, x: u16, y: u16, width: u16, height: u16) {
@@ -57,7 +58,7 @@ impl AlbumWindow {
                     .fg(if self.selected {
                         Color::LightRed
                     } else {
-                        Color::Gray
+                        Color::DarkGray
                     })
                     .add_modifier(if self.selected {
                         Modifier::BOLD
@@ -92,12 +93,12 @@ impl AlbumWindow {
                 } else if i == self.album_selected {
                     Style::default().fg(Color::Black).bg(Color::LightBlue)
                 } else {
-                    Style::default().fg(Color::Gray)
+                    Style::default().fg(Color::DarkGray)
                 }
             } else if i == self.album_selected {
                 Style::default().fg(Color::Black).bg(Color::LightBlue)
             } else {
-                Style::default()
+                Style::default().fg(Color::DarkGray)
             };
 
             let rect = Rect {
@@ -113,7 +114,7 @@ impl AlbumWindow {
         frame.render_widget(Paragraph::new("").block(block), self.area);
     }
 
-    const BORDER: usize = 5;
+    const BORDER: usize = 0;
 
     pub fn down(&mut self) {
         if self.album_names.is_empty() {
@@ -140,9 +141,7 @@ impl AlbumWindow {
             self.album_selected -= 1;
         }
 
-        if self.album_selected < self.offset + Self::BORDER
-            && self.offset > 0
-        {
+        if self.album_selected < self.offset + Self::BORDER && self.offset > 0 {
             self.offset -= 1;
         }
     }

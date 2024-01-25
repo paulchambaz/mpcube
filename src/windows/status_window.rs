@@ -1,12 +1,11 @@
 use ratatui::{
     layout::Rect,
-    prelude::{CrosstermBackend, Stylize, Terminal},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph},
+    widgets::Paragraph,
     Frame,
 };
 
-use crate::mpd_client::{MusicData, StateData};
+use crate::mpd_client::{Client, MusicData, StateData};
 
 pub struct StatusWindow {
     shuffle: bool,
@@ -23,9 +22,9 @@ impl StatusWindow {
         }
     }
 
-    pub fn update(&mut self, music_data: &MusicData, state_data: &StateData) {
-        // self.shuffle = state_data.shuffle;
-        // self.repeat = state_data.repeat;
+    pub fn update(&mut self, _: bool, _: &MusicData, state_data: &StateData) {
+        self.shuffle = state_data.shuffle;
+        self.repeat = state_data.repeat;
     }
 
     pub fn update_area(&mut self, x: u16, y: u16, width: u16, height: u16) {
@@ -38,9 +37,11 @@ impl StatusWindow {
     pub fn render(&mut self, frame: &mut Frame) {
         let area = self.area;
         let style_shuffle = if self.shuffle {
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-        } else {
             Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
         };
         let rect_shuffle = Rect {
             x: area.x,
@@ -48,12 +49,17 @@ impl StatusWindow {
             width: 9,
             height: 1,
         };
-        frame.render_widget(Paragraph::new(" shuffle").style(style_shuffle), rect_shuffle);
+        frame.render_widget(
+            Paragraph::new(" shuffle").style(style_shuffle),
+            rect_shuffle,
+        );
 
         let style_repeat = if self.repeat {
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-        } else {
             Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::DarkGray)
         };
         let rect_repeat = Rect {
             x: area.x,
@@ -64,11 +70,11 @@ impl StatusWindow {
         frame.render_widget(Paragraph::new("  repeat").style(style_repeat), rect_repeat);
     }
 
-    pub fn shuffle(&mut self) {
-        self.shuffle = !self.shuffle;
+    pub fn shuffle(&mut self, client: &mut Client) {
+        client.shuffle();
     }
 
-    pub fn repeat(&mut self) {
-        self.repeat = !self.repeat;
+    pub fn repeat(&mut self, client: &mut Client) {
+        client.repeat();
     }
 }
