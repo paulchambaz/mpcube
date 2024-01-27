@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::mpd_client::{Client, MusicData, StateData};
+use crate::mpd_client::{MusicData, StateData};
 
 pub struct StatusWindow {
     shuffle: bool,
@@ -68,13 +68,5 @@ impl StatusWindow {
             height: 1,
         };
         frame.render_widget(Paragraph::new("  repeat").style(style_repeat), rect_repeat);
-    }
-
-    pub fn shuffle(&mut self, client: &mut Client) {
-        client.shuffle();
-    }
-
-    pub fn repeat(&mut self, client: &mut Client) {
-        client.repeat();
     }
 }

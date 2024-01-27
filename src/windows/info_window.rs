@@ -1,6 +1,6 @@
 use ratatui::{layout::Rect, prelude::Stylize, style::Color, widgets::Paragraph, Frame};
 
-use crate::mpd_client::{Client, MusicData, StateData};
+use crate::mpd_client::{MusicData, StateData};
 
 pub struct InfoWindow {
     playing: bool,
@@ -89,9 +89,5 @@ impl InfoWindow {
                 self.area,
             );
         }
-    }
-
-    pub fn toggle(&mut self, client: &mut Client) {
-        client.toggle();
     }
 }

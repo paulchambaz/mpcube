@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::mpd_client::{MusicData, StateData};
+use crate::mpd_client::{Client, MusicData, StateData};
 
 pub struct TitleWindow {
     selected: bool,
@@ -60,22 +60,19 @@ impl TitleWindow {
 
     pub fn render(&mut self, frame: &mut Frame) {
         let a = self.area;
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Titles ")
-            .border_style(
-                Style::default()
-                    .fg(if self.selected {
-                        Color::LightRed
-                    } else {
-                        Color::DarkGray
-                    })
-                    .add_modifier(if self.selected {
-                        Modifier::BOLD
-                    } else {
-                        Modifier::empty()
-                    }),
-            );
+        let block = Block::default().borders(Borders::ALL).border_style(
+            Style::default()
+                .fg(if self.selected {
+                    Color::LightRed
+                } else {
+                    Color::DarkGray
+                })
+                .add_modifier(if self.selected {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
+        );
 
         for (i, (title, duration)) in self
             .title_names
@@ -146,13 +143,19 @@ impl TitleWindow {
             );
         }
 
+        frame.render_widget(Paragraph::new("").block(block), a);
+        let style = Style::default().fg(if self.selected {
+            Color::LightRed
+        } else {
+            Color::DarkGray
+        });
         frame.render_widget(
-            Paragraph::new("").block(block),
-            Rect::new(a.x, a.y, a.width, a.height),
+            Paragraph::new(" Titles ").style(style),
+            Rect::new(a.x + 4, 0, a.width - 4, 1),
         );
     }
 
-    const BORDER: usize = 0;
+    const BORDER: usize = 5;
 
     pub fn down(&mut self) {
         if self.title_names.is_empty() {
@@ -163,9 +166,8 @@ impl TitleWindow {
             self.title_selected += 1;
         }
 
-        if self.title_selected > self.area.height as usize - 3 - Self::BORDER
-            && self.offset < self.title_names.len() - self.area.height as usize + 2
-        {
+        if self.title_selected > self.offset + self.area.height as usize - 3 - Self::BORDER
+            && self.offset < self.title_names.len() - self.area.height as usize + 2 {
             self.offset += 1;
         }
     }
@@ -179,7 +181,8 @@ impl TitleWindow {
             self.title_selected -= 1;
         }
 
-        if self.title_selected < self.offset + Self::BORDER && self.offset > 0 {
+        if self.album_selected < self.offset + Self::BORDER 
+            && self.offset > 0 {
             self.offset -= 1;
         }
     }
@@ -190,5 +193,9 @@ impl TitleWindow {
 
     pub fn reset_selected(&mut self) {
         self.title_selected = 0;
+    }
+
+    pub fn play(&mut self, client: &mut Client) {
+        client.start_title(self.album_selected, self.title_selected);
     }
 }

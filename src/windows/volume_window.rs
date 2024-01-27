@@ -1,6 +1,6 @@
 use ratatui::{layout::Rect, prelude::Stylize, style::Color, widgets::Paragraph, Frame};
 
-use crate::mpd_client::{Client, MusicData, StateData};
+use crate::mpd_client::{MusicData, StateData};
 
 pub struct VolumeWindow {
     volume: i8,
@@ -30,35 +30,27 @@ impl VolumeWindow {
         let a = self.area;
         frame.render_widget(Paragraph::new(" Vol").fg(Color::DarkGray), self.area);
 
-        let volume_bar_width = a.width - 10;
-        for i in 0..volume_bar_width {
+        let start = a.x + 5;
+        let end = start + a.width - 11;
+
+        for i in start..=end {
             frame.render_widget(
                 Paragraph::new("─").fg(Color::DarkGray),
-                Rect::new(a.x + 5 + i, a.y, 1, 1),
+                Rect::new(i, a.y, 1, 1),
             );
         }
-        let start = 5;
-        let end = 5 + volume_bar_width;
-        let mut volume_indicator_position = start + ((end - start) * self.volume as u16 / 100);
-        if volume_indicator_position > end - 1 {
-            volume_indicator_position = end - 1;
-        }
+
+        let ratio = self.volume as f32 / 100.;
+        let cursor = ((1. - ratio) * start as f32 + ratio * end as f32) as u16;
+
         frame.render_widget(
             Paragraph::new("█").fg(Color::DarkGray),
-            Rect::new(a.x + volume_indicator_position, a.y, 1, 1),
+            Rect::new(cursor, a.y, 1, 1),
         );
 
         frame.render_widget(
             Paragraph::new(format!("{}%", self.volume)).fg(Color::DarkGray),
             Rect::new(a.x + a.width - 4, a.y, 4, 1),
         );
-    }
-
-    pub fn volume_up(&mut self, client: &mut Client) {
-        client.volume_up();
-    }
-
-    pub fn volume_down(&mut self, client: &mut Client) {
-        client.volume_down();
     }
 }

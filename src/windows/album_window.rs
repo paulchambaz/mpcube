@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::mpd_client::{MusicData, StateData};
+use crate::mpd_client::{Client, MusicData, StateData};
 
 pub struct AlbumWindow {
     selected: bool,
@@ -16,10 +16,6 @@ pub struct AlbumWindow {
     area: Rect,
 }
 
-// TODO: with time, im thinking a more general window class would be great to group a lot of the
-// logic toghether (mainly the logic of the size and the logic of the update
-
-// TODO: add mechanism to check if there has been an update and the window needs to be redrawn
 impl AlbumWindow {
     pub fn new() -> AlbumWindow {
         AlbumWindow {
@@ -50,22 +46,19 @@ impl AlbumWindow {
 
     pub fn render(&mut self, frame: &mut Frame) {
         let area = self.area;
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Albums ")
-            .border_style(
-                Style::default()
-                    .fg(if self.selected {
-                        Color::LightRed
-                    } else {
-                        Color::DarkGray
-                    })
-                    .add_modifier(if self.selected {
-                        Modifier::BOLD
-                    } else {
-                        Modifier::empty()
-                    }),
-            );
+        let block = Block::default().borders(Borders::ALL).border_style(
+            Style::default()
+                .fg(if self.selected {
+                    Color::LightRed
+                } else {
+                    Color::DarkGray
+                })
+                .add_modifier(if self.selected {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
+        );
 
         // TODO: this is probably inneficient and we can maybe draw everything at once
         // right now we do n renders for each album and 1 render for the box itself
@@ -112,9 +105,21 @@ impl AlbumWindow {
         }
 
         frame.render_widget(Paragraph::new("").block(block), self.area);
+
+        let album_str = " Albums ";
+        let album_strlen = album_str.len() as u16;
+        let style = Style::default().fg(if self.selected {
+            Color::LightRed
+        } else {
+            Color::DarkGray
+        });
+        frame.render_widget(
+            Paragraph::new(album_str).style(style),
+            Rect::new((area.width - album_strlen) / 2, 0, album_strlen, 1),
+        );
     }
 
-    const BORDER: usize = 0;
+    const BORDER: usize = 5;
 
     pub fn down(&mut self) {
         if self.album_names.is_empty() {
@@ -125,9 +130,8 @@ impl AlbumWindow {
             self.album_selected += 1;
         }
 
-        if self.album_selected > self.area.height as usize - 3 - Self::BORDER
-            && self.offset < self.album_names.len() - self.area.height as usize + 2
-        {
+        if self.album_selected > self.offset + self.area.height as usize - 3 - Self::BORDER
+            && self.offset < self.album_names.len() - self.area.height as usize + 2 {
             self.offset += 1;
         }
     }
@@ -141,8 +145,13 @@ impl AlbumWindow {
             self.album_selected -= 1;
         }
 
-        if self.album_selected < self.offset + Self::BORDER && self.offset > 0 {
+        if self.album_selected < self.offset + Self::BORDER 
+            && self.offset > 0 {
             self.offset -= 1;
         }
+    }
+
+    pub fn play(&mut self, client: &mut Client) {
+        client.start_album(self.album_selected);
     }
 }
