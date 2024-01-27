@@ -4,7 +4,7 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::prelude::{CrosstermBackend, Terminal};
-use std::io::{stdout, Stdout};
+use std::{io::{stdout, Stdout}, time::{Instant, Duration}};
 
 use crate::input::{Input, InputControl};
 use crate::music::music_client::Client;
@@ -34,39 +34,41 @@ impl Interface {
         let mut ui = Ui::new(client);
         let mut i = 0;
         loop {
-            // TODO: refactor this so it computes the exact time since the ui drawing will be the
-            // only time we actually have to wait - the rest is async so it starts instantly
-            // main canvas
+            let start = Instant::now();
+
             self.terminal
                 .draw(|frame| {
                     ui.render(frame);
                 })
                 .expect("Could not draw frame");
-
-            if event::poll(std::time::Duration::from_millis(16)).expect("Could not poll events") {
-
-                // this is where we will start the background update
-                // every 60 frames, we should run an update status and update song update
-
+            if event::poll(Duration::new(0, 0)).expect("Could not poll events") {
                 if let event::Event::Key(key) = event::read().expect("Could not read event") {
                     if key.kind == KeyEventKind::Press {
                         match Input::handle(key.code, &mut ui).await {
-                            InputControl::Continue => {}
+                            InputControl::Continue => continue,
                             InputControl::Break => break,
                         }
                     }
                 }
             }
 
-            if i % 30 == 0 {
+            if i % 48 == 0 {
                 i = 0;
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    let mut client = client_lock.lock().await;
-                    client.sync().await;
+                    if let Ok(client) = client_lock.try_lock().as_mut() {
+                        client.sync();
+                    }
                 });
             }
             i += 1;
+
+            let end = start.elapsed();
+            let mut wait = Duration::from_micros(16667);
+            if wait > end {
+                wait -= end;
+            }
+            tokio::time::sleep(wait).await;
         }
     }
 }

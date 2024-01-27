@@ -50,7 +50,7 @@ impl Ui {
         }
 
         // resizing the windows
-        let side_width = if a.width > 80 { 40 } else { a.width / 2 };
+        let side_width = if a.width > 100 { 40 } else { 2 * a.width / 5 };
         let volume_width = if a.width > 90 { 30 } else { a.width / 3 };
 
         self.album_window

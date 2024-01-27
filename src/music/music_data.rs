@@ -256,7 +256,6 @@ impl Album {
 
 impl RawMusicEntry {
     fn new(song: mpd::Song) -> Self {
-        println!("{:?}", song);
         let uri = song.file.clone();
 
         let tags: HashMap<_, _> = song
@@ -277,7 +276,7 @@ impl RawMusicEntry {
 
         let date = tags
             .get("DATA")
-            .or(tags.get("date"))
+            .or(tags.get("Date"))
             .and_then(|s| {
                 if let Some(year) = s.split('-').next() {
                     year.parse::<i32>().ok()

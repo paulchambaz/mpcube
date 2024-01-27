@@ -36,37 +36,25 @@ impl StatusWindow {
 
     pub fn render(&mut self, frame: &mut Frame) {
         let area = self.area;
-        let style_shuffle = if self.shuffle {
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
-        let rect_shuffle = Rect {
-            x: area.x,
-            y: area.y,
-            width: 9,
-            height: 1,
-        };
-        frame.render_widget(
-            Paragraph::new(" shuffle").style(style_shuffle),
-            rect_shuffle,
-        );
 
-        let style_repeat = if self.repeat {
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::DarkGray)
+        let get_style = |on: bool| {
+            if on {
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            }
         };
-        let rect_repeat = Rect {
-            x: area.x,
-            y: area.y + 1,
-            width: 9,
-            height: 1,
+
+        let mut render_widget = |text: &str, style: Style, x: u16, y: u16| {
+            frame.render_widget(
+                Paragraph::new(text).style(style),
+                Rect::new(area.x + x, area.y + y, text.len() as u16, 1),
+            );
         };
-        frame.render_widget(Paragraph::new("  repeat").style(style_repeat), rect_repeat);
+
+        render_widget("shuffle", get_style(self.shuffle), 1, 0);
+        render_widget("repeat", get_style(self.repeat), 2, 1);
     }
 }

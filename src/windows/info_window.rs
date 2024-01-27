@@ -1,4 +1,9 @@
-use ratatui::{layout::Rect, prelude::Stylize, style::Color, widgets::Paragraph, Frame};
+use ratatui::{
+    layout::Rect,
+    style::{Color, Style},
+    widgets::Paragraph,
+    Frame,
+};
 
 use crate::music::music_data::{MusicData, StateData};
 
@@ -49,7 +54,19 @@ impl InfoWindow {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let a = self.area;
+        let area = self.area;
+
+        let mut render_widget = |text: &str, highlight: bool, x: u16, w: u16| {
+            frame.render_widget(
+                Paragraph::new(text).style(Style::default().fg(if highlight {
+                    Color::Green
+                } else {
+                    Color::DarkGray
+                })),
+                Rect::new(area.x + x, area.y, w, 1),
+            );
+        };
+
         if let (Some(title), Some(artist), Some(album)) = (&self.title, &self.artist, &self.album) {
             let str: [&str; 6] = [
                 if self.playing { "Playing" } else { "Paused" },
@@ -62,32 +79,15 @@ impl InfoWindow {
             let len: Vec<u16> = str.iter().map(|s| s.len() as u16).collect();
 
             let mut sum = 1;
-
-            str.iter()
-                .zip(len.iter())
-                .enumerate()
-                .for_each(|(i, (&text, &length))| {
-                    if sum > a.width {
-                        return;
-                    }
-                    if i % 2 == 0 {
-                        frame.render_widget(
-                            Paragraph::new(text).fg(Color::DarkGray),
-                            Rect::new(a.x + sum, a.y, u16::min(length, a.width - sum), a.height),
-                        );
-                    } else {
-                        frame.render_widget(
-                            Paragraph::new(text).fg(Color::Green),
-                            Rect::new(a.x + sum, a.y, u16::min(length, a.width - sum), a.height),
-                        );
-                    }
-                    sum += length + 1;
-                });
+            for (i, (&text, &length)) in str.iter().zip(len.iter()).enumerate() {
+                if sum > area.width {
+                    return;
+                }
+                render_widget(text, i % 2 != 0, sum, u16::min(length, area.width - sum));
+                sum += length + 1;
+            }
         } else {
-            frame.render_widget(
-                Paragraph::new(" Not playing").fg(Color::DarkGray),
-                self.area,
-            );
+            render_widget("Not playing", false, 1, 11);
         }
     }
 }

@@ -1,4 +1,9 @@
-use ratatui::{layout::Rect, prelude::Stylize, style::Color, widgets::Paragraph, Frame};
+use ratatui::{
+    layout::Rect,
+    style::{Color, Style},
+    widgets::Paragraph,
+    Frame,
+};
 
 use crate::music::music_data::{MusicData, StateData};
 
@@ -27,30 +32,27 @@ impl VolumeWindow {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let a = self.area;
-        frame.render_widget(Paragraph::new(" Vol").fg(Color::DarkGray), self.area);
+        let area = self.area;
+        let style = Style::default().fg(Color::DarkGray);
 
-        let start = a.x + 5;
-        let end = start + a.width - 11;
-
-        for i in start..=end {
+        let mut render_widget = |text: &str, x: u16, w: u16| {
             frame.render_widget(
-                Paragraph::new("─").fg(Color::DarkGray),
-                Rect::new(i, a.y, 1, 1),
+                Paragraph::new(text).style(style),
+                Rect::new(area.x + x, area.y, w, 1),
             );
+        };
+
+        render_widget("Vol", 1, 3);
+        render_widget(&format!("{}%", self.volume), area.width - 4, 4);
+
+        let start = 5;
+        let end = area.width - 6;
+        for i in start..=end {
+            render_widget("─", i, 1);
         }
 
         let ratio = self.volume as f32 / 100.;
         let cursor = ((1. - ratio) * start as f32 + ratio * end as f32) as u16;
-
-        frame.render_widget(
-            Paragraph::new("█").fg(Color::DarkGray),
-            Rect::new(cursor, a.y, 1, 1),
-        );
-
-        frame.render_widget(
-            Paragraph::new(format!("{}%", self.volume)).fg(Color::DarkGray),
-            Rect::new(a.x + a.width - 4, a.y, 4, 1),
-        );
+        render_widget("█", cursor, 1);
     }
 }

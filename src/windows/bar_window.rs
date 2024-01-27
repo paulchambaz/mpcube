@@ -1,6 +1,11 @@
 use std::time::Duration;
 
-use ratatui::{layout::Rect, prelude::Stylize, style::Color, widgets::Paragraph, Frame};
+use ratatui::{
+    layout::Rect,
+    style::{Color, Style},
+    widgets::Paragraph,
+    Frame,
+};
 
 use crate::music::music_data::{MusicData, StateData};
 
@@ -25,7 +30,8 @@ impl BarWindow {
             let album = music_data
                 .albums
                 .get(album_id)
-                .expect("Could not find album playing"); // &Album
+                .expect("Could not find album playing");
+
             if let Some(title_id) = state_data.title_id {
                 let song = album
                     .songs
@@ -44,44 +50,39 @@ impl BarWindow {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        let a = self.area;
-        if let Some(position) = self.position {
-            let seconds = position.as_secs();
+        let area = self.area;
+        let style = Style::default().fg(Color::DarkGray);
+        let format_time =
+            |time: Duration| format!("{:02}:{:02}", time.as_secs() / 60, time.as_secs() % 60);
+
+        let mut render_widget = |text: &str, x: u16, w: u16| {
             frame.render_widget(
-                Paragraph::new(format!("{:02}:{:02}", seconds / 60, seconds % 60))
-                    .fg(Color::DarkGray),
-                Rect::new(a.x + 1, a.y, 5, 1),
+                Paragraph::new(text).style(style),
+                Rect::new(area.x + x, area.y, w, 1),
             );
-        }
-        if let Some(duration) = self.duration {
-            let seconds = duration.as_secs();
-            frame.render_widget(
-                Paragraph::new(format!("{:02}:{:02}", seconds / 60, seconds % 60))
-                    .fg(Color::DarkGray),
-                Rect::new(a.x + a.width - 5, a.y, 5, 1),
-            );
-        }
-        let start = a.x + 7;
-        let end = start + a.width - 14;
+        };
+
+        render_widget(
+            &format_time(self.position.unwrap_or(Duration::new(0, 0))),
+            1,
+            5,
+        );
+        render_widget(
+            &format_time(self.duration.unwrap_or(Duration::new(0, 0))),
+            area.width - 5,
+            5,
+        );
+
+        let start = 7;
+        let end = area.width - 7;
         for i in start..=end {
-            frame.render_widget(
-                Paragraph::new("─").fg(Color::DarkGray),
-                Rect::new(i, a.y, 1, 1),
-            );
+            render_widget("─", i, 1);
         }
 
         if let (Some(position), Some(duration)) = (self.position, self.duration) {
-            let duration = duration.as_millis() as f32;
-            let position = position.as_millis() as f32;
-
-            let ratio = position / duration;
-
+            let ratio = position.as_millis() as f32 / duration.as_millis() as f32;
             let cursor = ((1. - ratio) * start as f32 + ratio * end as f32) as u16;
-
-            frame.render_widget(
-                Paragraph::new("█").fg(Color::DarkGray),
-                Rect::new(cursor, a.y, 1, 1),
-            );
+            render_widget("█", cursor, 1);
         }
     }
 }

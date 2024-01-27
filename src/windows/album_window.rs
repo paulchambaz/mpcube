@@ -51,31 +51,19 @@ impl AlbumWindow {
 
     pub fn render(&mut self, frame: &mut Frame) {
         let area = self.area;
-        let block = Block::default().borders(Borders::ALL).border_style(
-            Style::default()
-                .fg(if self.selected {
-                    Color::LightRed
-                } else {
-                    Color::DarkGray
-                })
-                .add_modifier(if self.selected {
-                    Modifier::BOLD
-                } else {
-                    Modifier::empty()
-                }),
-        );
 
-        // TODO: this is probably inneficient and we can maybe draw everything at once
-        // right now we do n renders for each album and 1 render for the box itself
-        // maybe we have to seperate the box from the album names but its quite likely we can
-        // draw every text at once
-        // a key point is keeping the Rect since they provide excellent protection for
-        // overflowing
-        // maybe another way to solve this issue is rather to tell the renderer to not render
-        // for a while, give it a description of what exists, then render everything at once at
-        // the end to reduce draw calls
-        // that being said, its not so bad if it is slow since its only a very low number of
-        // items being drawn (n ~= 20)
+        let mut render_widget = |text: &str, style: Style, y: u16| {
+            frame.render_widget(
+                Paragraph::new(text).style(style),
+                Rect::new(
+                    area.x + 1,
+                    area.y + 1 + y - self.offset as u16,
+                    area.width - 2,
+                    1,
+                ),
+            );
+        };
+
         for (i, album) in self
             .album_names
             .iter()
@@ -83,48 +71,44 @@ impl AlbumWindow {
             .skip(self.offset)
             .take(area.height as usize - 2)
         {
-            let style = if let Some(playing) = self.album_playing {
-                if i == playing && i == self.album_selected {
-                    Style::default().fg(Color::Black).bg(Color::Cyan)
-                } else if i == playing {
-                    Style::default().fg(Color::Black).bg(Color::Green)
-                } else if i == self.album_selected {
-                    Style::default().fg(Color::Black).bg(Color::LightBlue)
-                } else {
-                    Style::default().fg(Color::DarkGray)
-                }
-            } else if i == self.album_selected {
-                Style::default().fg(Color::Black).bg(Color::LightBlue)
-            } else {
-                Style::default().fg(Color::DarkGray)
+            let playing_album = self.album_playing.map_or(false, |playing| playing == i);
+            let selected_album = self.album_selected == i;
+
+            let style = match (playing_album, selected_album) {
+                (true, true) => Style::default().fg(Color::Black).bg(Color::Cyan),
+                (true, false) => Style::default().fg(Color::Black).bg(Color::Green),
+                (false, true) => Style::default().fg(Color::Black).bg(Color::LightBlue),
+                (false, false) => Style::default().fg(Color::DarkGray),
             };
 
-            let rect = Rect {
-                x: area.x + 1,
-                y: area.y + 1 + (i - self.offset) as u16,
-                width: area.width - 2,
-                height: 1,
-            };
-
-            frame.render_widget(Paragraph::new(album.clone()).style(style), rect);
+            render_widget(album, style, i as u16);
         }
 
-        frame.render_widget(Paragraph::new("").block(block), self.area);
+        let text = "Album";
 
-        let album_str = " Albums ";
-        let album_strlen = album_str.len() as u16;
-        let style = Style::default().fg(if self.selected {
-            Color::LightRed
+        let border_style = if self.selected {
+            Style::default()
+                .fg(Color::LightRed)
+                .add_modifier(Modifier::BOLD)
         } else {
-            Color::DarkGray
-        });
+            Style::default().fg(Color::DarkGray)
+        };
+
         frame.render_widget(
-            Paragraph::new(album_str).style(style),
-            Rect::new((area.width - album_strlen) / 2, 0, album_strlen, 1),
+            Paragraph::new("").block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(border_style),
+            ),
+            area,
+        );
+
+        let len = text.len() as u16;
+        frame.render_widget(
+            Paragraph::new(format!(" {} ", text)).style(border_style),
+            Rect::new(area.x + (area.width - len - 2) / 2, area.y, len + 2, 1),
         );
     }
-
-    const BORDER: usize = 5;
 
     pub fn down(&mut self) {
         if self.album_names.is_empty() {
@@ -135,7 +119,17 @@ impl AlbumWindow {
             self.album_selected += 1;
         }
 
-        if self.album_selected > self.offset + self.area.height as usize - 3 - Self::BORDER
+        let border = match self.area.height as usize - 2 {
+            0..=3 => 0,
+            4..=7 => 1,
+            8..=11 => 2,
+            12..=15 => 3,
+            16..=19 => 4,
+            20..=usize::MAX => 5,
+            _ => 0,
+        };
+
+        if self.album_selected > self.offset + self.area.height as usize - 3 - border
             && self.offset < self.album_names.len() - self.area.height as usize + 2
         {
             self.offset += 1;
@@ -151,17 +145,27 @@ impl AlbumWindow {
             self.album_selected -= 1;
         }
 
-        if self.album_selected < self.offset + Self::BORDER && self.offset > 0 {
+        let border = match self.area.height as usize - 2 {
+            0..=3 => 0,
+            4..=7 => 1,
+            8..=11 => 2,
+            12..=15 => 3,
+            16..=19 => 4,
+            20..=usize::MAX => 5,
+            _ => 0,
+        };
+
+        if self.album_selected < self.offset + border && self.offset > 0 {
             self.offset -= 1;
         }
     }
 
-    pub async fn play(&mut self, client: &mut Arc<Mutex<Client>>) {
+    pub fn play(&mut self, client: &mut Arc<Mutex<Client>>) {
         let client_lock = client.clone();
         let album_selected = self.album_selected;
         tokio::spawn(async move {
             let mut client = client_lock.lock().await;
-            client.start_album(album_selected).await;
+            client.start_album(album_selected);
         });
     }
 }

@@ -43,6 +43,9 @@
       src = self;
 
       cargoLock.lockFile = ./Cargo.lock;
+      cargoLock.outputHashes = {
+        "mpd-0.1.0" = "sha256-YVatWNIfSd98shfzgdD5rJ40indfge/2bT54DtJIQ1k=";
+      };
 
       nativeBuildInputs = [ rust-toolchain ];
       buildInputs = buildPkgs ++ libPkgs;
