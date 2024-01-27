@@ -1,9 +1,9 @@
-use std::time::Duration;
+use mpd::State;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
-use serde::{Deserialize, Serialize};
-use mpd::State;
 use std::io::{Read, Write};
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct StateData {
@@ -48,7 +48,6 @@ struct RawMusicEntry {
     duration: Duration,
 }
 
-
 impl StateData {
     pub fn new(client: &mut mpd::Client, music_data: &MusicData) -> Self {
         let status = client.status().expect("Could not connect to mpd");
@@ -88,16 +87,14 @@ impl StateData {
         }
     }
 
-    pub fn update_status(&mut self, client: &mut mpd::Client) {
+    pub fn update(&mut self, client: &mut mpd::Client, music_data: &MusicData) {
         let status = client.status().expect("Could not connect to mpd");
         self.playing = status.state == State::Play;
         self.position = status.elapsed;
         self.volume = status.volume;
         self.shuffle = status.random;
         self.repeat = status.repeat;
-    }
 
-    pub fn update_song(&mut self, client: &mut mpd::Client, music_data: &MusicData) {
         let song = client.currentsong();
         let id: Option<(usize, usize)> = if let Ok(Some(song)) = song {
             let album_opt = song

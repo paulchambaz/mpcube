@@ -6,9 +6,11 @@ use crate::{
     },
 };
 use ratatui::Frame;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct Ui {
-    pub client: Client,
+    pub client: Arc<Mutex<Client>>,
     pub on_album: bool,
     pub album_window: AlbumWindow,
     pub title_window: TitleWindow,
@@ -21,7 +23,7 @@ pub struct Ui {
 impl Ui {
     pub fn new(client: Client) -> Self {
         Ui {
-            client,
+            client: Arc::new(Mutex::new(client)),
             on_album: true,
             album_window: AlbumWindow::new(),
             title_window: TitleWindow::new(),
@@ -35,21 +37,17 @@ impl Ui {
     pub fn render(&mut self, frame: &mut Frame) {
         let a = frame.size();
         let on_album = self.on_album;
-        let data = &self.client.data;
-        let state = &self.client.state;
 
-        // TODO: updating this each and every time might be slow..
-        // furthermore if we do async operations we want to add some kind of
-        // protection so that it does not get read while this is getting updated
-        // and the ui is being changed...
-
-        // updating windows
-        self.album_window.update(on_album, data, state);
-        self.title_window.update(on_album, data, state);
-        self.info_window.update(on_album, data, state);
-        self.volume_window.update(on_album, data, state);
-        self.bar_window.update(on_album, data, state);
-        self.status_window.update(on_album, data, state);
+        if let Ok(client) = self.client.try_lock() {
+            let data = &client.data;
+            let state = &client.state;
+            self.album_window.update(on_album, data, state);
+            self.title_window.update(on_album, data, state);
+            self.info_window.update(on_album, data, state);
+            self.volume_window.update(on_album, data, state);
+            self.bar_window.update(on_album, data, state);
+            self.status_window.update(on_album, data, state);
+        }
 
         // resizing the windows
         let side_width = if a.width > 80 { 40 } else { a.width / 2 };

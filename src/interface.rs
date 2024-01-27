@@ -30,9 +30,12 @@ impl Interface {
         Interface { terminal }
     }
 
-    pub fn render(&mut self, client: Client) {
+    pub async fn render(&mut self, client: Client) {
         let mut ui = Ui::new(client);
+        let mut i = 0;
         loop {
+            // TODO: refactor this so it computes the exact time since the ui drawing will be the
+            // only time we actually have to wait - the rest is async so it starts instantly
             // main canvas
             self.terminal
                 .draw(|frame| {
@@ -41,18 +44,29 @@ impl Interface {
                 .expect("Could not draw frame");
 
             if event::poll(std::time::Duration::from_millis(16)).expect("Could not poll events") {
+
                 // this is where we will start the background update
                 // every 60 frames, we should run an update status and update song update
 
                 if let event::Event::Key(key) = event::read().expect("Could not read event") {
                     if key.kind == KeyEventKind::Press {
-                        match Input::handle(key.code, &mut ui) {
+                        match Input::handle(key.code, &mut ui).await {
                             InputControl::Continue => {}
                             InputControl::Break => break,
                         }
                     }
                 }
             }
+
+            if i % 30 == 0 {
+                i = 0;
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.sync().await;
+                });
+            }
+            i += 1;
         }
     }
 }

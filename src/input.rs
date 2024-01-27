@@ -10,7 +10,7 @@ pub enum InputControl {
 pub struct Input;
 
 impl Input {
-    pub fn handle(key: KeyCode, ui: &mut Ui) -> InputControl {
+    pub async fn handle(key: KeyCode, ui: &mut Ui) -> InputControl {
         match key {
             KeyCode::Char('q') => return InputControl::Break,
             KeyCode::Char('Q') => return InputControl::Break,
@@ -44,43 +44,87 @@ impl Input {
             }
             KeyCode::Enter => {
                 if ui.on_album {
-                    ui.album_window.play(&mut ui.client);
+                    ui.album_window.play(&mut ui.client).await;
                 } else {
-                    ui.title_window.play(&mut ui.client);
+                    ui.title_window.play(&mut ui.client).await;
                 }
             }
             KeyCode::Char(' ') => {
-                ui.client.toggle();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.toggle().await;
+                });
             }
             KeyCode::Char('n') => {
-                ui.client.next();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.next().await;
+                });
             }
             KeyCode::Char('p') => {
-                ui.client.previous();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.previous().await;
+                });
             }
             KeyCode::Char('=') => {
-                ui.client.volume_up();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.volume_up().await;
+                });
             }
             KeyCode::Char('-') => {
-                ui.client.volume_down();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.volume_down().await;
+                });
             }
             KeyCode::Char('x') => {
-                ui.client.clear();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.clear().await;
+                });
             }
             KeyCode::Char('.') => {
-                ui.client.seek_forward();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.seek_forward().await;
+                });
             }
             KeyCode::Char(',') => {
-                ui.client.seek_backward();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.seek_backward().await;
+                });
             }
             KeyCode::Char('s') => {
-                ui.client.shuffle();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.shuffle().await;
+                });
             }
             KeyCode::Char('r') => {
-                ui.client.repeat();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.repeat().await;
+                });
             }
             KeyCode::Char('U') => {
-                ui.client.full_sync();
+                let client_lock = ui.client.clone();
+                tokio::spawn(async move {
+                    let mut client = client_lock.lock().await;
+                    client.full_sync().await;
+                });
             }
             _ => {}
         }

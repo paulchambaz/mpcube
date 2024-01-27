@@ -5,7 +5,12 @@ use ratatui::{
     Frame,
 };
 
-use crate::music::{music_client::Client, music_data::{MusicData, StateData}};
+use crate::music::{
+    music_client::Client,
+    music_data::{MusicData, StateData},
+};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct AlbumWindow {
     selected: bool,
@@ -131,7 +136,8 @@ impl AlbumWindow {
         }
 
         if self.album_selected > self.offset + self.area.height as usize - 3 - Self::BORDER
-            && self.offset < self.album_names.len() - self.area.height as usize + 2 {
+            && self.offset < self.album_names.len() - self.area.height as usize + 2
+        {
             self.offset += 1;
         }
     }
@@ -145,13 +151,17 @@ impl AlbumWindow {
             self.album_selected -= 1;
         }
 
-        if self.album_selected < self.offset + Self::BORDER 
-            && self.offset > 0 {
+        if self.album_selected < self.offset + Self::BORDER && self.offset > 0 {
             self.offset -= 1;
         }
     }
 
-    pub fn play(&mut self, client: &mut Client) {
-        client.start_album(self.album_selected);
+    pub async fn play(&mut self, client: &mut Arc<Mutex<Client>>) {
+        let client_lock = client.clone();
+        let album_selected = self.album_selected;
+        tokio::spawn(async move {
+            let mut client = client_lock.lock().await;
+            client.start_album(album_selected).await;
+        });
     }
 }

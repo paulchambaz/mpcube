@@ -6,8 +6,13 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
-use crate::music::{music_client::Client, music_data::{MusicData, StateData}};
+use crate::music::{
+    music_client::Client,
+    music_data::{MusicData, StateData},
+};
 
 pub struct TitleWindow {
     selected: bool,
@@ -167,7 +172,8 @@ impl TitleWindow {
         }
 
         if self.title_selected > self.offset + self.area.height as usize - 3 - Self::BORDER
-            && self.offset < self.title_names.len() - self.area.height as usize + 2 {
+            && self.offset < self.title_names.len() - self.area.height as usize + 2
+        {
             self.offset += 1;
         }
     }
@@ -181,8 +187,7 @@ impl TitleWindow {
             self.title_selected -= 1;
         }
 
-        if self.album_selected < self.offset + Self::BORDER 
-            && self.offset > 0 {
+        if self.album_selected < self.offset + Self::BORDER && self.offset > 0 {
             self.offset -= 1;
         }
     }
@@ -195,7 +200,13 @@ impl TitleWindow {
         self.title_selected = 0;
     }
 
-    pub fn play(&mut self, client: &mut Client) {
-        client.start_title(self.album_selected, self.title_selected);
+    pub async fn play(&mut self, client: &mut Arc<Mutex<Client>>) {
+        let client_lock = client.clone();
+        let album_selected = self.album_selected;
+        let title_selected = self.title_selected;
+        tokio::spawn(async move {
+            let mut client = client_lock.lock().await;
+            client.start_title(album_selected, title_selected).await;
+        });
     }
 }
