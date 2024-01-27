@@ -5,7 +5,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::mpd_client::{MusicData, StateData};
+use crate::music::music_data::{MusicData, StateData};
 
 pub struct StatusWindow {
     shuffle: bool,

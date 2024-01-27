@@ -1,6 +1,6 @@
 use ratatui::{layout::Rect, prelude::Stylize, style::Color, widgets::Paragraph, Frame};
 
-use crate::mpd_client::{MusicData, StateData};
+use crate::music::music_data::{MusicData, StateData};
 
 pub struct VolumeWindow {
     volume: i8,

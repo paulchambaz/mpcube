@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::mpd_client::{Client, MusicData, StateData};
+use crate::music::{music_client::Client, music_data::{MusicData, StateData}};
 
 pub struct TitleWindow {
     selected: bool,

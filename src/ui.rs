@@ -1,5 +1,5 @@
 use crate::{
-    mpd_client::Client,
+    music::music_client::Client,
     windows::{
         album_window::AlbumWindow, bar_window::BarWindow, info_window::InfoWindow,
         status_window::StatusWindow, title_window::TitleWindow, volume_window::VolumeWindow,

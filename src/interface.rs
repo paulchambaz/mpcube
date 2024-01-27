@@ -7,7 +7,7 @@ use ratatui::prelude::{CrosstermBackend, Terminal};
 use std::io::{stdout, Stdout};
 
 use crate::input::{Input, InputControl};
-use crate::mpd_client::Client;
+use crate::music::music_client::Client;
 use crate::ui::Ui;
 
 pub struct Interface {
