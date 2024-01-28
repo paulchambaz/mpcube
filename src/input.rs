@@ -17,7 +17,6 @@ impl Input {
             KeyCode::Char('j') => {
                 if ui.on_album {
                     ui.album_window.down();
-                    // TODO: this should only occur if we actually change position
                     ui.title_window
                         .update_titles(ui.album_window.album_selected);
                     ui.title_window.reset_selected();
@@ -28,7 +27,6 @@ impl Input {
             KeyCode::Char('k') => {
                 if ui.on_album {
                     ui.album_window.up();
-                    // TODO: this should only occur if we actually change position
                     ui.title_window
                         .update_titles(ui.album_window.album_selected);
                     ui.title_window.reset_selected();
@@ -52,9 +50,8 @@ impl Input {
             KeyCode::Char(' ') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    if let Ok(client) = client_lock.try_lock().as_mut() {
-                        client.toggle();
-                    }
+                    let mut client = client_lock.lock().await;
+                    client.toggle();
                 });
             }
             KeyCode::Char('n') => {
@@ -74,17 +71,15 @@ impl Input {
             KeyCode::Char('=') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    if let Ok(client) = client_lock.try_lock().as_mut() {
-                        client.volume_up();
-                    }
+                    let mut client = client_lock.lock().await;
+                    client.volume_up();
                 });
             }
             KeyCode::Char('-') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    if let Ok(client) = client_lock.try_lock().as_mut() {
-                        client.volume_down();
-                    }
+                    let mut client = client_lock.lock().await;
+                    client.volume_down();
                 });
             }
             KeyCode::Char('x') => {
@@ -97,33 +92,29 @@ impl Input {
             KeyCode::Char('.') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    if let Ok(client) = client_lock.try_lock().as_mut() {
-                        client.seek_forward();
-                    }
+                    let mut client = client_lock.lock().await;
+                    client.seek_forward();
                 });
             }
             KeyCode::Char(',') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    if let Ok(client) = client_lock.try_lock().as_mut() {
-                        client.seek_backward();
-                    }
+                    let mut client = client_lock.lock().await;
+                    client.seek_backward();
                 });
             }
             KeyCode::Char('s') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    if let Ok(client) = client_lock.try_lock().as_mut() {
-                        client.shuffle();
-                    }
+                    let mut client = client_lock.lock().await;
+                    client.shuffle();
                 });
             }
             KeyCode::Char('r') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
-                    if let Ok(client) = client_lock.try_lock().as_mut() {
-                        client.repeat();
-                    }
+                    let mut client = client_lock.lock().await;
+                    client.repeat();
                 });
             }
             KeyCode::Char('U') => {

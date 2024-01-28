@@ -4,7 +4,10 @@ use crossterm::{
     ExecutableCommand,
 };
 use ratatui::prelude::{CrosstermBackend, Terminal};
-use std::{io::{stdout, Stdout}, time::{Instant, Duration}};
+use std::{
+    io::{stdout, Stdout},
+    time::{Duration, Instant},
+};
 
 use crate::input::{Input, InputControl};
 use crate::music::music_client::Client;

@@ -1,6 +1,6 @@
-use rand::Rng;
 use crate::music::music_data::{MusicData, StateData};
-use std::{time::Duration, net::IpAddr, path::PathBuf};
+use rand::Rng;
+use std::{net::IpAddr, path::PathBuf, time::Duration};
 
 pub struct Client {
     pub client: mpd::Client,
@@ -14,7 +14,10 @@ impl Client {
         let mut client = mpd::Client::connect(format!("{}:{}", address, port))
             .expect("Could not connect to mpd");
 
-        let cache_path = cache_path.to_str().expect("Could not get cache path").to_string();
+        let cache_path = cache_path
+            .to_str()
+            .expect("Could not get cache path")
+            .to_string();
 
         let data = if std::path::Path::new(&cache_path).exists() {
             MusicData::from_cache(&cache_path)
@@ -192,7 +195,7 @@ impl Client {
         let mut rng = rand::thread_rng();
         let mut album_id;
         loop {
-            album_id = rng.gen_range(0..self.data.albums.len());  
+            album_id = rng.gen_range(0..self.data.albums.len());
             if let Some(album_playing) = self.state.album_id {
                 if album_id != album_playing {
                     break;

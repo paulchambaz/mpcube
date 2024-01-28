@@ -68,20 +68,20 @@ impl TitleWindow {
 
         let mut render_widget = |left: &str, right: &str, style: Style, y: u16| {
             frame.render_widget(
-                Paragraph::new(right),
-                Rect::new(
-                    area.x + area.width - u16::min(right.len() as u16, area.width - 4) - 2,
-                    area.y + 1 + y - self.offset as u16,
-                    u16::min(right.len() as u16, area.width - 4),
-                    1,
-                ),
-            );
-            frame.render_widget(
                 Paragraph::new(left),
                 Rect::new(
                     area.x + 2,
                     area.y + 1 + y - self.offset as u16,
                     u16::min(left.len() as u16, area.width - 4),
+                    1,
+                ),
+            );
+            frame.render_widget(
+                Paragraph::new(right),
+                Rect::new(
+                    area.x + area.width - u16::min(right.len() as u16, area.width - 4) - 2,
+                    area.y + 1 + y - self.offset as u16,
+                    u16::min(right.len() as u16, area.width - 4),
                     1,
                 ),
             );
@@ -121,7 +121,7 @@ impl TitleWindow {
             let secs = duration.as_secs();
             render_widget(
                 &format!("{:2} - {}", i + 1, title),
-                &format!("  {:02}:{:02} {}", secs / 60, secs % 60, self.title_author),
+                &format!(" {:02}:{:02} {}", secs / 60, secs % 60, self.title_author),
                 style,
                 i as u16,
             );

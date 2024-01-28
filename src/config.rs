@@ -1,6 +1,6 @@
-use serde::Deserialize;
-use std::{path::PathBuf, net::IpAddr, str::FromStr};
 use clap::Parser;
+use serde::Deserialize;
+use std::{net::IpAddr, path::PathBuf, str::FromStr};
 
 use directories::ProjectDirs;
 use std::fs;
@@ -37,9 +37,11 @@ struct Args {
 }
 
 pub fn load_config() -> Config {
-    let project_dirs = ProjectDirs::from("", "", "mpcube").expect("Could not get standard directories");
+    let project_dirs =
+        ProjectDirs::from("", "", "mpcube").expect("Could not get standard directories");
 
-    let mut mpd_host: IpAddr = IpAddr::from_str("127.0.0.1").expect("Could not parse default ip address");
+    let mut mpd_host: IpAddr =
+        IpAddr::from_str("127.0.0.1").expect("Could not parse default ip address");
     let mut mpd_port: u16 = 6600;
     let mut cache: PathBuf = project_dirs.cache_dir().join("cache");
 

@@ -21,3 +21,6 @@ coverage:
 
 fmt:
   cargo fmt
+
+vhs:
+  nix shell -c vhs demo.tape

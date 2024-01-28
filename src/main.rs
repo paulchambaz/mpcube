@@ -1,15 +1,15 @@
 extern crate mpd;
 
+mod config;
 mod input;
 mod interface;
 mod music;
 mod ui;
 mod windows;
-mod config;
 
+use config::load_config;
 use interface::Interface;
 use music::music_client::Client;
-use config::load_config;
 use tokio::time::error::Error;
 
 #[tokio::main]

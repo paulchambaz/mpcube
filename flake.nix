@@ -25,6 +25,7 @@
     devPkgs = with pkgs; [
       just
       cargo-tarpaulin
+      vhs
     ];
 
     environment = with pkgs; {
