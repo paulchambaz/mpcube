@@ -4,7 +4,7 @@ mpcube is a straightforward music player client for [MPD (Music Player Daemon)](
 
 ![](./demo.gif)
 
-mpcube is a music player client optimized for those who prefer enjoying albums from back to back. Designed to work with [MPD](https://github.com/MusicPlayerDaemon/MPD), it offers a straightforward, text-based interface, emphasizing album playback over shuffled songs or playlists. The tool is ideal for users who have an organized collection of albums and seek a focused, album-centric listening experience. Simple yet functional, it provides an uncluttered environment to dive into your music, one album at a time. The interface is mostly derived from the great music player [musikcube](https://github.com/clangen/musikcube).
+mpcube is a lightweight, terminal-based client for the [Music Player Daemon (MPD)](https://github.com/MusicPlayerDaemon/MPD), designed to provide an efficient and focused music listening experience. Emphasizing album-centric playback, mpcube allows users to navigate and  play their music collection with a simple and intuitive interface. Inspired by *musikube*, it aims to cater to users who prefer structured album listening sessions over shuffled tracks or playlists.
 
 ## Installation
 
