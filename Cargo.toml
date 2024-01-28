@@ -6,6 +6,10 @@ homepage = "https://github.com/paulchambaz/mpcube"
 version = "0.1.0"
 edition = "2021"
 include = ["src/**/*", "README.md"]
+license-file = "LICENSE"
+readme = "README.md"
+documentation = "https://docs.rs/mpcube"
+keywords = [ "music", "player", "mpd" ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,7 +19,7 @@ clap = { version = "4.4.18", features = ["derive"] }
 crossterm = "0.27.0"
 directories = "5.0.1"
 # mpd = "0.1.0"
-mpd = { git = "https://github.com/paulchambaz/rust-mpd", branch = "listallinfo" }
+mpd = { git = "https://github.com/paulchambaz/rust-mpd", branch = "listallinfo", version = "0.1.0" }
 rand = "0.8.5"
 ratatui = { version = "0.25.0", features = ["serde"] }
 serde = { version = "1.0.195", features = ["derive"] }
