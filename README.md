@@ -68,6 +68,14 @@ To develop, you will probably need the following programs :
 - `cargo-tarpaulin` - to run the coverage metrics
 - `vhs` - to produce the gif at the top of this page
 
+```sh
+just run
+just build
+just fmt
+just coverage
+just watch-test
+```
+
 ## Contribution
 
 Contributions to mpcube are welcome. Whether it's feature suggestions, bug reports, or code contributions, feel free to share your input. Please use the project's GitHub repository to open issues or submit pull requests.
