@@ -31,7 +31,7 @@ struct Args {
     #[clap(long)]
     mpd_port: Option<u16>,
 
-    /// Cache file location [default ~/.cache/mpcube/cache]
+    /// Cache file location [default: ~/.cache/mpcube/cache]
     #[clap(long)]
     cache: Option<PathBuf>,
 }

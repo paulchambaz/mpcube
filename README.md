@@ -48,7 +48,7 @@ Usage: mpcube [OPTIONS]
 Options:
       --mpd-host <MPD_HOST>  Ip address of the mpd host [default: 127.0.0.1]
       --mpd-port <MPD_PORT>  Port number of the mpd host [default: 6600]
-      --cache <CACHE>        Cache file location [default ~/.cache/mpcube/cache]
+      --cache <CACHE>        Cache file location [default: ~/.cache/mpcube/cache]
   -h, --help                 Print help
   -V, --version              Print version
 ```
