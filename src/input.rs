@@ -26,7 +26,7 @@ impl Input {
     /// break)
     pub async fn handle(key: KeyCode, ui: &mut Ui) -> InputControl {
         match key {
-            KeyCode::Char('q') => {
+            KeyCode::Char('q') | KeyCode::Char('Q') => {
                 let client_lock = ui.client.clone();
                 tokio::spawn(async move {
                     let mut client = client_lock.lock().await;
@@ -34,15 +34,7 @@ impl Input {
                 });
                 return InputControl::Break;
             },
-            KeyCode::Char('Q') => {
-                let client_lock = ui.client.clone();
-                tokio::spawn(async move {
-                    let mut client = client_lock.lock().await;
-                    client.clear();
-                });
-                return InputControl::Break;
-            },
-            KeyCode::Char('j') => {
+            KeyCode::Char('j') | KeyCode::Down => {
                 if ui.on_album {
                     ui.album_window.down();
                     ui.title_window
@@ -52,17 +44,7 @@ impl Input {
                     ui.title_window.down();
                 }
             }
-            KeyCode::Down => {
-                if ui.on_album {
-                    ui.album_window.down();
-                    ui.title_window
-                        .update_titles(ui.album_window.album_selected);
-                    ui.title_window.reset_selected();
-                } else {
-                    ui.title_window.down();
-                }
-            }
-            KeyCode::Char('k') => {
+            KeyCode::Char('k') | KeyCode::Up => {
                 if ui.on_album {
                     ui.album_window.up();
                     ui.title_window
@@ -72,26 +54,10 @@ impl Input {
                     ui.title_window.up();
                 }
             }
-            KeyCode::Up => {
-                if ui.on_album {
-                    ui.album_window.up();
-                    ui.title_window
-                        .update_titles(ui.album_window.album_selected);
-                    ui.title_window.reset_selected();
-                } else {
-                    ui.title_window.up();
-                }
-            }
-            KeyCode::Char('l') => {
+            KeyCode::Char('l') | KeyCode::Right => {
                 ui.on_album = false;
             }
-            KeyCode::Right => {
-                ui.on_album = false;
-            }
-            KeyCode::Char('h') => {
-                ui.on_album = true;
-            }
-            KeyCode::Left => {
+            KeyCode::Char('h') | KeyCode::Left => {
                 ui.on_album = true;
             }
             KeyCode::Enter => {

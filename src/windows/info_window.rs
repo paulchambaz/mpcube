@@ -41,8 +41,6 @@ impl InfoWindow {
     /// - `music_data`: The mpd library representation
     /// - `state_data`: The current mpd state reprensentation
     pub fn update(&mut self, _: bool, music_data: &MusicData, state_data: &StateData) {
-        // TODO: In the event of a clear, we should default back to None for the album, artist and title
-
         // Update if we are playing
         self.playing = state_data.playing;
         // If a song is playing
@@ -64,6 +62,10 @@ impl InfoWindow {
                     .title
                     .clone(),
             );
+        } else {
+            self.album = None;
+            self.artist = None;
+            self.title = None;
         }
     }
 

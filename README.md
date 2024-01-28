@@ -8,8 +8,6 @@ mpcube is a music player client optimized for those who prefer enjoying albums f
 
 ## Installation
 
-Currently, the easiest way to install this project is with nix. In the future, it will be added to the Arch Linux user repository. The project can also be installed via Cargo.
-
 ### Nix
 
 You can try out the program with `nix-shell` :
@@ -28,9 +26,17 @@ It's a good way to ensure it works as intended. Once you're satisfied, you may a
 cargo install mpcube
 ```
 
+### AUR
+
+`mpcube` is also hosted on the [Arch Linux User Repository](https://aur.archlinux.org/packages/mpcube). To install it, simply :
+
+```sh
+yay -S mpcube
+```
+
 ### Manual
 
-To install the project manually, please consult the [Building](#Building) section.
+To install the project manually, please consult the [**Building**](#Building) section.
 
 ## Usage
 

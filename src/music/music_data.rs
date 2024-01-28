@@ -186,9 +186,11 @@ impl MusicData {
             match current_album.as_mut() {
                 // If we have a given album for them already, we add it to the list of songs
                 Some(album) if album.album == entry.album => {
-                    // TODO: it would be good to update the author to the shortest author on the
-                    // track list, given that it most often is the author (without featuring) and
-                    // is therefore most often the real author name
+                    // We make sure that the artist is the shortest possible artist (less likely to
+                    // be a featuring)
+                    if entry.artist.len() < album.artist.len() {
+                        album.artist = entry.artist;
+                    }
                     album.songs.push(Song {
                         uri: entry.uri,
                         title: entry.title,
