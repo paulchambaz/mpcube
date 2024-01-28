@@ -1,6 +1,6 @@
 [package]
 name = "mpcube"
-description = "Mpd client inspired by musikube"
+description = "Simple album focused mpd terminal client"
 authors = [ "Paul Chambaz <paul.chambaz@tuta.com>" ]
 homepage = "https://github.com/paulchambaz/mpcube"
 version = "0.1.0"

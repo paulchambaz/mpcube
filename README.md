@@ -38,6 +38,23 @@ In order to use this client, you will first need to configure the `mpd` server. 
 
 To understand how to use this program, please consult the `man` page. All instructions are detailed there. You may also read them from the `mpcube.1.scd` file.
 
+Here is a brief overview of the program :
+
+```sh
+Simple album focused mpd terminal client
+
+Usage: mpcube [OPTIONS]
+
+Options:
+      --mpd-host <MPD_HOST>  Ip address of the mpd host [default: 127.0.0.1]
+      --mpd-port <MPD_PORT>  Port number of the mpd host [default: 6600]
+      --cache <CACHE>        Cache file location [default ~/.cache/mpcube/cache]
+  -h, --help                 Print help
+  -V, --version              Print version
+```
+
+You can also add these to `~/.config/mpcube/config.toml`, so that they are stored.
+
 ## Building
 
 ### Nix

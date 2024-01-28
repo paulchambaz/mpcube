@@ -17,9 +17,6 @@ and is designed to listen to albums - not playlists.
 
 *--version*		Print version information to stdout and exit.
 
-*-vvv*				Increase the verbosity level - error (default), warning, info,
-debug
-
 # AUTHORS
 
 This program was written by Paul Chambaz in 2024. It is licensed under the
