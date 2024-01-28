@@ -1,3 +1,6 @@
+//! This module defines the main loop of the program, it creates the ui, displays
+//! the ui, polls the input and starts background tasks
+
 use crossterm::{
     event::{self, KeyEventKind},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -13,11 +16,14 @@ use crate::input::{Input, InputControl};
 use crate::music::music_client::Client;
 use crate::ui::Ui;
 
+/// Stores key information about the interface
 pub struct Interface {
+    /// Which terminal is used for the user interface
     terminal: Terminal<CrosstermBackend<Stdout>>,
 }
 
 impl Interface {
+    /// Creates a new interface and initializes it
     pub fn new() -> Interface {
         stdout()
             .execute(EnterAlternateScreen)
@@ -33,17 +39,18 @@ impl Interface {
         Interface { terminal }
     }
 
+    /// Renders the interface
+    /// First we poll the events
+    /// Then we render the user interface
+    /// Finally we start background recurring tasks
+    ///
+    /// - `client`: The client used for the mpd connection
     pub async fn render(&mut self, client: Client) {
         let mut ui = Ui::new(client);
         let mut i = 0;
         loop {
             let start = Instant::now();
 
-            self.terminal
-                .draw(|frame| {
-                    ui.render(frame);
-                })
-                .expect("Could not draw frame");
             if event::poll(Duration::new(0, 0)).expect("Could not poll events") {
                 if let event::Event::Key(key) = event::read().expect("Could not read event") {
                     if key.kind == KeyEventKind::Press {
@@ -54,6 +61,12 @@ impl Interface {
                     }
                 }
             }
+
+            self.terminal
+                .draw(|frame| {
+                    ui.render(frame);
+                })
+                .expect("Could not draw frame");
 
             if i % 48 == 0 {
                 i = 0;
@@ -77,6 +90,7 @@ impl Interface {
 }
 
 impl Drop for Interface {
+    /// Destroys the user interface and clears the screen
     fn drop(&mut self) {
         stdout()
             .execute(LeaveAlternateScreen)
