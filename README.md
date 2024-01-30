@@ -8,9 +8,15 @@ mpcube is a lightweight, terminal-based client for the [Music Player Daemon (MPD
 
 ## Installation
 
+Currently, the only way to install this project is manually, however, in the close future, I intend to publish it to crates.io, nixpkgs and the arch user repository.
+
+### Manual
+
+To install the project manually, please consult the [**Building**](#Building) section.
+
 ### Nix
 
-You can try out the program with `nix-shell` :
+**Coming soon.** You can try out the program with `nix-shell` :
 
 ```sh
 nix-shell -p mpcube
@@ -20,7 +26,7 @@ It's a good way to ensure it works as intended. Once you're satisfied, you may a
 
 ### Cargo
 
-`mpcube` is hosted on [crates.io](https://crates.io/crates/mpcube). To install it, simply :
+**Coming soon.** `mpcube` is hosted on [crates.io](https://crates.io/crates/mpcube). To install it, simply :
 
 ```sh
 cargo install mpcube
@@ -28,15 +34,11 @@ cargo install mpcube
 
 ### AUR
 
-`mpcube` is also hosted on the [Arch Linux User Repository](https://aur.archlinux.org/packages/mpcube). To install it, simply :
+**Coming soon.** `mpcube` is also hosted on the [Arch Linux User Repository](https://aur.archlinux.org/packages/mpcube). To install it, simply :
 
 ```sh
 yay -S mpcube
 ```
-
-### Manual
-
-To install the project manually, please consult the [**Building**](#Building) section.
 
 ## Usage
 
