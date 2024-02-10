@@ -262,6 +262,7 @@ impl TitleWindow {
     /// Reset the title selected
     pub fn reset_selected(&mut self) {
         self.title_selected = 0;
+        self.offset = 0;
     }
 
     /// Play a given song
