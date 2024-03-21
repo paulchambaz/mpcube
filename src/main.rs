@@ -30,7 +30,9 @@ async fn main() -> Result<(), Error> {
     let config = load_config();
 
     let client = Client::new(config.mpd_host, config.mpd_port, config.cache);
-    Interface::new().render(client).await;
+
+    let mut interface = Interface::new();
+    interface.render(client).await;
 
     Ok(())
 }
