@@ -26,40 +26,32 @@
         cargo-tarpaulin
         vhs
       ];
+    in {
+      packages.default = pkgs.rustPlatform.buildRustPackage {
+        pname = "mpcube";
+        version = "1.0.0";
+        src = ./.;
+        cargoHash = "";
 
-    in
-  {
-    packages.default = pkgs.rustPlatform.buildRustPackage {
-      pname = "mpcube";
-      version = "1.0.0";
-      src = ./.;
-      cargoHash = "";
-
-      cargoLock = {
-        lockFile = ./Cargo.lock;
-        outputHashes = {
-          "mpd-0.1.0" = "sha256-YVatWNIfSd98shfzgdD5rJ40indfge/2bT54DtJIQ1k=";
+        cargoLock = {
+          lockFile = ./Cargo.lock;
+          outputHashes = {
+            "mpd-0.1.0" = "sha256-YVatWNIfSd98shfzgdD5rJ40indfge/2bT54DtJIQ1k=";
+          };
         };
+
+        nativeBuildInputs = buildPkgs;
+        buildInputs = libPkgs;
+
+        postInstall = ''
+          mkdir -p $out/share/man/man1
+          scdoc < mpcube.1.scd > $out/share/man/man1/mpcube.1
+        '';
       };
 
-      nativeBuildInputs = buildPkgs;
-      buildInputs = libPkgs;
-
-      configurePhase = ''
-        export PATH=${pkgs.lib.makeBinPath buildPkgs}:$PATH
-      '';
-
-      postInstall = ''
-        mkdir -p $out/share/man/man1
-        scdoc < mpcube.1.scd > $out/share/man/man1/mpcube.1
-      '';
-    };
-
-    devShell = pkgs.mkShell {
-        buildInputs = libPkgs ++ buildPkgs ++ devPkgs;
-
-        shellHook = ''
-        '';
-    };
-  });
+      devShell = pkgs.mkShell {
+        nativeBuildInputs = buildPkgs;
+        buildInputs = libPkgs ++ devPkgs;
+      };
+    });
 }
