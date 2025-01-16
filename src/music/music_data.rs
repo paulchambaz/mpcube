@@ -80,7 +80,7 @@ struct RawMusicEntry {
 
 impl StateData {
     /// Creates a new representation of the state of the mpd server
-    /// 
+    ///
     /// - `client` - The mpd client used to get state info from
     /// - `music_data` - The representation of the mpd library
     ///

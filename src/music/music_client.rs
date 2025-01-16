@@ -231,7 +231,11 @@ impl Client {
     /// Seeks backward in the current mpd song
     pub fn seek_backward(&mut self) {
         if let Some(position) = self.state.position {
-            let target = if position < Duration::new(5, 0) { Duration::new(0, 0) } else { position - Duration::new(5, 0) };
+            let target = if position < Duration::new(5, 0) {
+                Duration::new(0, 0)
+            } else {
+                position - Duration::new(5, 0)
+            };
             if self.client.rewind(target).is_ok() {
                 self.sync();
             }

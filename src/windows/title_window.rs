@@ -68,12 +68,19 @@ impl TitleWindow {
         // Reconstructs the list of title names and durations of the selected album
         self.title_names.clear();
         self.title_durations.clear();
-        for song in &music_data.albums[self.album_selected].songs {
-            self.title_names.push(song.title.clone());
-            self.title_durations.push(song.duration);
+        if let Some(album) = &music_data.albums.get(self.album_selected) {
+            for song in &album.songs {
+                self.title_names.push(song.title.clone());
+                self.title_durations.push(song.duration);
+            }
         }
         // Update the author name of the selected album
-        self.title_author = music_data.albums.get(self.album_selected).expect("Could not find album selected").artist.clone();
+        self.title_author = music_data
+            .albums
+            .get(self.album_selected)
+            .expect("Could not find album selected")
+            .artist
+            .clone();
 
         // Finally update if an album and song is playing
         self.album_playing = state_data.album_id;
