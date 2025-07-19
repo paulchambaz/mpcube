@@ -4,3 +4,4 @@
 *.profraw
 tarpaulin*
 *.bin
+/mpcube
