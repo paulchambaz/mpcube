@@ -17,7 +17,7 @@ To install the project manually, please consult the [**Building**](#Building) se
 ### Nix
 
 ```sh
-nix-shell -p mpcube
+nix shell github:paulchambaz/mpcube
 ```
 
 It's a good way to ensure it works as intended. Once you're satisfied, you may add it to your `configuration.nix`.
