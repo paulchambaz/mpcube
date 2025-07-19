@@ -4,7 +4,7 @@ mpcube is a straightforward music player client for [MPD (Music Player Daemon)](
 
 ![](./demo.gif)
 
-mpcube is a lightweight, terminal-based client for the [Music Player Daemon (MPD)](https://github.com/MusicPlayerDaemon/MPD), designed to provide an efficient and focused music listening experience. Emphasizing album-centric playback, mpcube allows users to navigate and  play their music collection with a simple and intuitive interface. Inspired by *musikube*, it aims to cater to users who prefer structured album listening sessions over shuffled tracks or playlists.
+mpcube is a lightweight, terminal-based client for the [Music Player Daemon (MPD)](https://github.com/MusicPlayerDaemon/MPD), designed to provide an efficient and focused music listening experience. Emphasizing album-centric playback, mpcube allows users to navigate and play their music collection with a simple and intuitive interface. Inspired by _musikube_, it aims to cater to users who prefer structured album listening sessions over shuffled tracks or playlists.
 
 ## Installation
 
@@ -16,28 +16,16 @@ To install the project manually, please consult the [**Building**](#Building) se
 
 ### Nix
 
-**Coming soon.** You can try out the program with `nix-shell` :
-
 ```sh
 nix-shell -p mpcube
 ```
 
 It's a good way to ensure it works as intended. Once you're satisfied, you may add it to your `configuration.nix`.
 
-### Cargo
-
-**Coming soon.** `mpcube` is hosted on [crates.io](https://crates.io/crates/mpcube). To install it, simply :
+### Go
 
 ```sh
-cargo install mpcube
-```
-
-### AUR
-
-**Coming soon.** `mpcube` is also hosted on the [Arch Linux User Repository](https://aur.archlinux.org/packages/mpcube). To install it, simply :
-
-```sh
-yay -S mpcube
+go install github.com/paulchambaz/mpcube@latest
 ```
 
 ## Usage
@@ -84,21 +72,18 @@ If you want to manually build the project without nix, it should not be too hard
 
 You will need to following program and libraries :
 
-- `libmpdclient` - for runtime
 - `scdoc` - to compile the man page
 
 To develop, you will probably need the following programs :
 
 - `just` - to have access to the dev commands
-- `cargo-tarpaulin` - to run the coverage metrics
 - `vhs` - to produce the gif at the top of this page
 
 ```sh
 just run
 just build
 just fmt
-just coverage
-just watch-test
+just test
 ```
 
 ## Contribution
