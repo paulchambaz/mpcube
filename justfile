@@ -1,5 +1,5 @@
-run:
-  go run .
+run * ARGS:
+  go run . {{ ARGS }}
 
 build:
   go build .

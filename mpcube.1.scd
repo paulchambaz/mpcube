@@ -19,15 +19,44 @@ sessions over shuffled tracks or playlists.
 
 # OPTIONS
 
-*mpd-host <MPD_HOST>*  Ip address of the mpd host [default: 127.0.0.1]
+*--mpd-host* <HOST>
+	MPD host address [default: 127.0.0.1]
 
-*mpd-port <MPD_PORT>*  Port number of the mpd host [default: 6600]
+*--mpd-port* <PORT>
+	MPD port number [default: 6600]
 
-*--cache <CACHE>*      Cache file location [default: ~/.cache/mpcube/cache]
+*--volume-step* <STEP>
+	Volume adjustment step [default: 10]
 
-*-h*, *--help*         Print help
+*--seek-duration* <MS>
+	Seek duration in milliseconds [default: 5000]
 
-*-V*, *--version*      Print version
+*--tick-interval* <MS>
+	UI refresh interval in milliseconds [default: 100]
+
+*--max-retry-delay* <SECONDS>
+	Max MPD reconnect delay in seconds [default: 30]
+
+*--scroll-padding* <LINES>
+	Scroll padding lines [default: 5]
+
+*--wide-threshold* <COLS>
+	Terminal width for wide layout [default: 100]
+
+*--album-width* <COLS>
+	Album panel width in wide layout [default: 40]
+
+*--volume-bar-threshold* <COLS>
+	Terminal width for wide volume bar [default: 90]
+
+*--volume-bar-width* <COLS>
+	Volume bar width in wide layout [default: 30]
+
+*-h*, *--help*
+	Print help
+
+*--version*
+	Print version
 
 # MUSIC PLAYER DAEMON
 
@@ -73,26 +102,77 @@ wiki*'s page on mpd, or *NixOS wiki*'s page on mpd for more information.
 
 # CONFIGURATION
 
-Configuration of *mpcube* is handles through the *~/.config/mpcube/config.toml*
-file. This file allows you to customize the basic settings of mpcube.
+Configuration of *mpcube* is handled through the *~/.config/mpcube/config.toml*
+file. All fields are optional — defaults are used for any missing value.
 
-It contains three optional fields, feel free to leave any of them empty if your
-mpd configuration does not require any change:
+Settings are loaded in this order, with later sources overriding earlier ones:
+defaults, config file, environment variables, CLI arguments.
 
 ```
 mpd_host = "127.0.0.1"
 mpd_port = 6600
-chahe = "~/.cache/mpcube/cache"
+volume_step = 10
+seek_duration = 5000
+tick_interval = 100
+max_retry_delay = 30
+scroll_padding = 5
+wide_threshold = 100
+album_width = 40
+volume_bar_threshold = 90
+volume_bar_width = 30
 ```
 
-*mpd_host* is the ip address of your mpd instance, if you have installed your
-*mpd* server on the same computer than *mpcube*, then you do not need to change
-this setting. *mpd_port* is the port of your mpd instance, if you have followed
-this guide or did not change the *mpd* default port, then you do not need to
-change this setting. Finally *cache* is the path to the cache file, a cache file
-is kept so that startup times are faster. For an estimation, on my system,
-parsing my library of ~1600 files takes ~.2 seconds, with the cache, it is
-instant.
+*mpd_host* is the IP address of your MPD instance. If you have installed your
+MPD server on the same computer as *mpcube*, you do not need to change this
+setting. [default: 127.0.0.1]
+
+*mpd_port* is the port of your MPD instance. If you have followed this guide or
+did not change the MPD default port, you do not need to change this setting.
+[default: 6600]
+
+*volume_step* is the percentage by which the volume increases or decreases each
+time you press the volume up or volume down key. For example, with the default
+value of 10, each keypress adjusts the volume by 10%. [default: 10]
+
+*seek_duration* is the amount of time in milliseconds that the playback position
+moves when you press the seek forward or seek backward key. The default value
+of 5000 means each keypress seeks by 5 seconds. [default: 5000]
+
+*tick_interval* is the interval in milliseconds at which *mpcube* polls the MPD
+server for state updates such as track position, volume changes, and playback
+status. Lower values make the UI more responsive but use slightly more
+resources. [default: 100]
+
+*max_retry_delay* is the maximum number of seconds *mpcube* will wait between
+reconnection attempts when the MPD server is unreachable. Retries use
+exponential backoff up to this limit. [default: 30]
+
+*scroll_padding* controls how many lines of context remain visible above or
+below the cursor when scrolling through the album or track list. A higher value
+keeps the cursor further from the edge of the panel. On small terminals, the
+padding is reduced proportionally. [default: 5]
+
+*wide_threshold* is the terminal width in columns above which *mpcube* switches
+to a wide layout with a fixed-width album panel. Below this threshold, the
+album panel takes up a proportional fraction of the terminal width instead.
+[default: 100]
+
+*album_width* is the width in columns of the album panel when the terminal is
+wider than *wide_threshold*. This has no effect when the terminal is narrower
+than the threshold. [default: 40]
+
+*volume_bar_threshold* is the terminal width in columns above which the volume
+bar uses a fixed width. Below this threshold, the volume bar takes up a
+proportional fraction of the terminal width instead. [default: 90]
+
+*volume_bar_width* is the width in columns of the volume bar when the terminal
+is wider than *volume_bar_threshold*. This has no effect when the terminal is
+narrower than the threshold. [default: 30]
+
+Environment variables can also be used to override settings. *MPD_HOST* and
+*MPD_PORT* set the MPD connection. All other settings use the *MPCUBE_* prefix
+with the setting name in uppercase (e.g. *MPCUBE_VOLUME_STEP*,
+*MPCUBE_SEEK_DURATION*).
 
 # ALBUM AND TITLE WINDOW
 

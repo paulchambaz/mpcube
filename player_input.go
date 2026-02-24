@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"math/rand"
 	"time"
 
@@ -61,12 +60,7 @@ func (ps *PlayerState) moveUp() {
 		return
 	}
 
-	var padding int
-	if ps.windowHeight-4 < 20 {
-		padding = int(math.Floor(float64(ps.windowHeight-4) / 5.0))
-	} else {
-		padding = 5
-	}
+	padding := min(ps.config.ScrollPadding, (ps.windowHeight-4)/4)
 
 	if ps.onAlbum {
 		if ps.albumSelected > 0 {
@@ -94,12 +88,7 @@ func (ps *PlayerState) moveDown() {
 		return
 	}
 
-	var padding int
-	if ps.windowHeight-4 < 20 {
-		padding = int(math.Floor(float64(ps.windowHeight-4) / 5.0))
-	} else {
-		padding = 5
-	}
+	padding := min(ps.config.ScrollPadding, (ps.windowHeight-4)/4)
 
 	if ps.onAlbum {
 		if ps.albumSelected < len(albums)-1 {
@@ -257,7 +246,7 @@ func (ps *PlayerState) prevTrack() error {
 }
 
 func (ps *PlayerState) volumeUp() error {
-	newVol := min(100, ps.volume+10)
+	newVol := min(100, ps.volume+ps.config.VolumeStep)
 	if err := ps.mpdClient.SetVolume(newVol); err != nil {
 		return err
 	}
@@ -265,7 +254,7 @@ func (ps *PlayerState) volumeUp() error {
 }
 
 func (ps *PlayerState) volumeDown() error {
-	newVol := max(0, ps.volume-10)
+	newVol := max(0, ps.volume-ps.config.VolumeStep)
 	if err := ps.mpdClient.SetVolume(newVol); err != nil {
 		return err
 	}
@@ -300,11 +289,12 @@ func (ps *PlayerState) seekForward() error {
 		return nil
 	}
 
-	if *ps.position > ps.musicData.Albums[*ps.albumPlaying].Songs[*ps.trackPlaying].Duration-4200*time.Millisecond {
+	seekDur := time.Duration(ps.config.SeekDuration) * time.Millisecond
+	if *ps.position > ps.musicData.Albums[*ps.albumPlaying].Songs[*ps.trackPlaying].Duration-seekDur {
 		return ps.nextTrack()
 	}
 
-	if err := ps.mpdClient.SeekCur(4200*time.Millisecond, true); err != nil {
+	if err := ps.mpdClient.SeekCur(seekDur, true); err != nil {
 		return err
 	}
 	return ps.updateMPDState()
@@ -315,12 +305,13 @@ func (ps *PlayerState) seekBackward() error {
 		return nil
 	}
 
-	if *ps.position < 5400*time.Millisecond {
+	seekDur := time.Duration(ps.config.SeekDuration) * time.Millisecond
+	if *ps.position < seekDur {
 		if err := ps.mpdClient.SeekCur(0, false); err != nil {
 			return err
 		}
 	} else {
-		if err := ps.mpdClient.SeekCur(-5400*time.Millisecond, true); err != nil {
+		if err := ps.mpdClient.SeekCur(-seekDur, true); err != nil {
 			return err
 		}
 	}

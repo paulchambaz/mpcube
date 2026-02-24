@@ -11,6 +11,7 @@ import (
 )
 
 type PlayerState struct {
+	config    Config
 	musicData *MusicData
 	mpdClient *mpd.Client
 
@@ -35,8 +36,9 @@ type PlayerState struct {
 	retryCount int
 }
 
-func NewPlayerState(musicData *MusicData, mpdClient *mpd.Client) (*PlayerState, error) {
+func NewPlayerState(config Config, musicData *MusicData, mpdClient *mpd.Client) (*PlayerState, error) {
 	ps := &PlayerState{
+		config:        config,
 		musicData:     musicData,
 		mpdClient:     mpdClient,
 		onAlbum:       true,
@@ -104,7 +106,7 @@ func (ps *PlayerState) Init() tea.Cmd {
 }
 
 func (ps *PlayerState) tickCmd() tea.Cmd {
-	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
+	return tea.Tick(time.Duration(ps.config.TickInterval)*time.Millisecond, func(time.Time) tea.Msg {
 		return tickMsg{}
 	})
 }
@@ -122,7 +124,7 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		if err := ps.updateMPDState(); err != nil {
 			ps.retryCount++
-			delay := time.Duration(math.Min(float64(ps.retryCount*ps.retryCount), 30)) * time.Second
+			delay := time.Duration(math.Min(float64(ps.retryCount*ps.retryCount), float64(ps.config.MaxRetryDelay))) * time.Second
 			return ps, tea.Tick(delay, func(time.Time) tea.Msg { return tickMsg{} })
 		}
 		ps.retryCount = 0

@@ -8,9 +8,10 @@ import (
 )
 
 func main() {
-	config := Config{
-		MPDHost: "127.0.0.1",
-		MPDPort: 6600,
+	config, err := LoadConfig()
+	if err != nil {
+		fmt.Printf("Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
 
 	client, err := NewMPDClient(config.MPDHost, config.MPDPort)
@@ -26,7 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	player, err := NewPlayerState(musicData, client)
+	player, err := NewPlayerState(config, musicData, client)
 	if err != nil {
 		fmt.Printf("Failed to connect to music daemon: %v\n", err)
 		os.Exit(1)

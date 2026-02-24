@@ -14,8 +14,8 @@ func (ps *PlayerState) View() string {
 	}
 
 	leftWidth := 0
-	if ps.windowWidth > 100 {
-		leftWidth = 40 - 2
+	if ps.windowWidth > ps.config.WideThreshold {
+		leftWidth = ps.config.AlbumWidth - 2
 	} else {
 		leftWidth = 2*ps.windowWidth/5 - 2
 	}
@@ -28,8 +28,8 @@ func (ps *PlayerState) View() string {
 	mainView := lipgloss.JoinHorizontal(0.0, leftPanel, rightPanel)
 
 	volumeWidth := 0
-	if ps.windowWidth > 90 {
-		volumeWidth = 30
+	if ps.windowWidth > ps.config.VolumeBarThreshold {
+		volumeWidth = ps.config.VolumeBarWidth
 	} else {
 		volumeWidth = ps.windowWidth / 3
 	}
@@ -169,13 +169,17 @@ func (ps *PlayerState) renderTrackPanel(width, height int) string {
 		seconds := int(track.Duration.Seconds())
 		right := fmt.Sprintf("%02d:%02d %s ", seconds/60, seconds%60, album.Artist)
 		title := track.Title
-		maxWidth := width - len(left) - len(right) - 2
+		maxWidth := max(0, width-len(left)-len(right)-2)
 		if len(title) > maxWidth {
 			title = title[:maxWidth]
 		}
 		center := fmt.Sprintf("%-*s", maxWidth, title)
 
-		line := trackStyle.Render(fmt.Sprintf("%s %s %s", left, center, right))
+		fullLine := fmt.Sprintf("%s %s %s", left, center, right)
+		if len(fullLine) > width {
+			fullLine = fullLine[:width]
+		}
+		line := trackStyle.Render(fmt.Sprintf("%-*s", width, fullLine))
 		content = append(content, line)
 	}
 
@@ -294,32 +298,28 @@ func (ps *PlayerState) renderStatusBar() string {
 }
 
 func (ps *PlayerState) resize() {
-	var padding int
-	if ps.windowHeight-4 < 20 {
-		padding = int(math.Floor(float64(ps.windowHeight-4) / 5.0))
-	} else {
-		padding = 5
-	}
+	panelHeight := ps.windowHeight - 4
+	padding := min(ps.config.ScrollPadding, panelHeight/4)
 
-	if ps.albumSelected < ps.albumOffset {
+	if ps.albumSelected < ps.albumOffset+padding {
 		ps.albumOffset = ps.albumSelected - padding
 	}
 
-	if ps.albumSelected > ps.albumOffset+ps.windowHeight {
-		ps.albumOffset = ps.albumSelected - ps.windowHeight + 5 + padding
+	if ps.albumSelected >= ps.albumOffset+panelHeight-padding {
+		ps.albumOffset = ps.albumSelected - panelHeight + 1 + padding
 	}
 
 	ps.albumOffset = max(ps.albumOffset, 0)
-	ps.albumOffset = min(ps.albumOffset, max(0, len(ps.musicData.Albums)-ps.windowHeight+4))
+	ps.albumOffset = min(ps.albumOffset, max(0, len(ps.musicData.Albums)-panelHeight))
 
-	if ps.trackSelected < ps.trackOffset {
+	if ps.trackSelected < ps.trackOffset+padding {
 		ps.trackOffset = ps.trackSelected - padding
 	}
 
-	if ps.trackSelected > ps.trackOffset+ps.windowHeight {
-		ps.trackOffset = ps.trackSelected - ps.windowHeight + 5 + padding
+	if ps.trackSelected >= ps.trackOffset+panelHeight-padding {
+		ps.trackOffset = ps.trackSelected - panelHeight + 1 + padding
 	}
 
 	ps.trackOffset = max(ps.trackOffset, 0)
-	ps.trackOffset = min(ps.trackOffset, max(0, len(ps.musicData.Albums[ps.albumSelected].Songs)-ps.windowHeight+4))
+	ps.trackOffset = min(ps.trackOffset, max(0, len(ps.musicData.Albums[ps.albumSelected].Songs)-panelHeight))
 }
