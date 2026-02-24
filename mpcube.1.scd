@@ -231,7 +231,9 @@ bindings:
 - *r* - Toggle *repeat* mode
 - *U* - Full scan of the *mpd* database
 - *R* - Play one album at random
-- *q*, *Q* - Quits *mpcube* and clears the *mpd* queue
+- *g*, *Home* - Go to top of list
+- *G*, *End* - Go to bottom of list
+- *q*, *Q*, *Ctrl+c* - Quits *mpcube* and clears the *mpd* queue
 
 # AUTHORS
 

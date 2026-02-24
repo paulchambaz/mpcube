@@ -1,18 +1,10 @@
 # mpcube
 
-mpcube is a straightforward music player client for [MPD (Music Player Daemon)](https://github.com/MusicPlayerDaemon/MPD), drawing inspiration from [musikube](https://github.com/clangen/musikcube). It offers an intuitive, terminal-based interface, allowing users to efficiently manage and play their music.
+mpcube is a lightweight, terminal-based client for [MPD (Music Player Daemon)](https://github.com/MusicPlayerDaemon/MPD), focused on album-centric playback. Navigate and play your music collection with a simple, vim-inspired interface. Inspired by [musikcube](https://github.com/clangen/musikcube).
 
 ![](./demo.gif)
 
-mpcube is a lightweight, terminal-based client for the [Music Player Daemon (MPD)](https://github.com/MusicPlayerDaemon/MPD), designed to provide an efficient and focused music listening experience. Emphasizing album-centric playback, mpcube allows users to navigate and play their music collection with a simple and intuitive interface. Inspired by _musikube_, it aims to cater to users who prefer structured album listening sessions over shuffled tracks or playlists.
-
 ## Installation
-
-Currently, the only way to install this project is manually, however, in the close future, I intend to publish it to crates.io, nixpkgs and the arch user repository.
-
-### Manual
-
-To install the project manually, please consult the [**Building**](#Building) section.
 
 ### Nix
 
@@ -20,7 +12,7 @@ To install the project manually, please consult the [**Building**](#Building) se
 nix shell github:paulchambaz/mpcube
 ```
 
-It's a good way to ensure it works as intended. Once you're satisfied, you may add it to your `configuration.nix`.
+Once you're satisfied, you may add it to your `configuration.nix`.
 
 ### Go
 
@@ -30,54 +22,51 @@ go install github.com/paulchambaz/mpcube@latest
 
 ## Usage
 
-In order to use this client, you will first need to configure the `mpd` server. Make sure to follow their instructions first.
+You will need a running MPD server. Make sure to follow [MPD's documentation](https://www.musicpd.org/) first.
 
-To understand how to use this program, please consult the `man` page. All instructions are detailed there. You may also read them from the `mpcube.1.scd` file.
-
-Here is a brief overview of the program :
-
-```sh
-Simple album focused mpd terminal client
-
+```
 Usage: mpcube [OPTIONS]
 
 Options:
-      --mpd-host <MPD_HOST>  Ip address of the mpd host [default: 127.0.0.1]
-      --mpd-port <MPD_PORT>  Port number of the mpd host [default: 6600]
-      --cache <CACHE>        Cache file location [default: ~/.cache/mpcube/cache]
-  -h, --help                 Print help
-  -V, --version              Print version
+  --mpd-host          MPD host address (default: 127.0.0.1)
+  --mpd-port          MPD port number (default: 6600)
+  --volume-step       volume adjustment step (default: 10)
+  --seek-duration     seek duration in milliseconds (default: 5000)
+  --tick-interval     UI refresh interval in milliseconds (default: 100)
+  --max-retry-delay   max MPD reconnect delay in seconds (default: 30)
+  --scroll-padding    scroll padding lines (default: 5)
+  --wide-threshold    terminal width for wide layout (default: 100)
+  --album-width       album panel width in wide layout (default: 40)
+  --volume-bar-threshold  terminal width for wide volume bar (default: 90)
+  --volume-bar-width  volume bar width in wide layout (default: 30)
+  --version           print version
+  -h, --help          print help
 ```
 
-You can also add these to `~/.config/mpcube/config.toml`, so that they are stored.
+All options can also be set in `~/.config/mpcube/config.toml`. See the man page for full details.
 
 ## Building
 
 ### Nix
 
-This project uses [nix](https://github.com/NixOS/nix) for development. If you want to contribute, it is recommended to install nix (not NixOS) to access the development shell.
+This project uses [nix](https://github.com/NixOS/nix) for development.
 
 ```sh
 git clone https://github.com/paulchambaz/mpcube.git
 cd mpcube
 nix develop
-nix build # to build the project
-nix shell # to enter a shell where the built project is installed
-just --list # to list the dev commands
+nix build       # build the project
+nix shell       # enter a shell with mpcube installed
+just --list     # list dev commands
 ```
 
 ### Manual
 
-If you want to manually build the project without nix, it should not be too hard.
+You will need Go and optionally:
 
-You will need to following program and libraries :
-
-- `scdoc` - to compile the man page
-
-To develop, you will probably need the following programs :
-
-- `just` - to have access to the dev commands
-- `vhs` - to produce the gif at the top of this page
+- `scdoc` — to compile the man page
+- `just` — to use the dev commands
+- `vhs` — to produce the demo GIF
 
 ```sh
 just run
@@ -88,7 +77,7 @@ just test
 
 ## Contribution
 
-Contributions to mpcube are welcome. Whether it's feature suggestions, bug reports, or code contributions, feel free to share your input. Please use the project's GitHub repository to open issues or submit pull requests.
+Contributions to mpcube are welcome. Whether it's feature suggestions, bug reports, or code contributions, feel free to open issues or submit pull requests.
 
 ## License
 

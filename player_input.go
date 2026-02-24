@@ -284,6 +284,10 @@ func (ps *PlayerState) clear() error {
 	return ps.updateMPDState()
 }
 
+// MPD adds ~550ms of forward drift per seek during playback due to audio
+// output buffer refill. Compensate so .,/,. returns to the same position.
+const seekDrift = 550 * time.Millisecond
+
 func (ps *PlayerState) seekForward() error {
 	if ps.albumPlaying == nil || ps.trackPlaying == nil {
 		return nil
@@ -294,7 +298,12 @@ func (ps *PlayerState) seekForward() error {
 		return ps.nextTrack()
 	}
 
-	if err := ps.mpdClient.SeekCur(seekDur, true); err != nil {
+	actualSeek := seekDur
+	if ps.playing {
+		actualSeek -= seekDrift
+	}
+
+	if err := ps.mpdClient.SeekCur(actualSeek, true); err != nil {
 		return err
 	}
 	return ps.updateMPDState()
@@ -311,7 +320,11 @@ func (ps *PlayerState) seekBackward() error {
 			return err
 		}
 	} else {
-		if err := ps.mpdClient.SeekCur(-seekDur, true); err != nil {
+		actualSeek := seekDur
+		if ps.playing {
+			actualSeek += seekDrift
+		}
+		if err := ps.mpdClient.SeekCur(-actualSeek, true); err != nil {
 			return err
 		}
 	}
