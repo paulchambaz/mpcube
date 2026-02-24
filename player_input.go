@@ -33,8 +33,8 @@ type keyMap struct {
 
 var keys = keyMap{
 	quit:          key.NewBinding(key.WithKeys("q", "Q", "ctrl+c"), key.WithHelp("q", "quit")),
-	left:          key.NewBinding(key.WithKeys("left", "l"), key.WithHelp("l", "switch to titles")),
-	right:         key.NewBinding(key.WithKeys("right", "h"), key.WithHelp("h", "switch to albums")),
+	left:          key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("h", "switch to albums")),
+	right:         key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("l", "switch to titles")),
 	up:            key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
 	down:          key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
 	top:           key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),

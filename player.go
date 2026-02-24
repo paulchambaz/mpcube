@@ -133,9 +133,18 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, keys.quit):
 			_ = ps.clear()
 			return ps, tea.Quit
-		case key.Matches(msg, keys.left):
-			ps.onAlbum = false
 		case key.Matches(msg, keys.right):
+			ps.onAlbum = false
+			if len(ps.musicData.Albums) > 0 {
+				lastTrack := len(ps.musicData.Albums[ps.albumSelected].Songs) - 1
+				if ps.trackSelected > lastTrack {
+					ps.trackSelected = lastTrack
+				}
+				if ps.trackOffset > lastTrack {
+					ps.trackOffset = max(0, lastTrack-ps.windowHeight+5)
+				}
+			}
+		case key.Matches(msg, keys.left):
 			ps.onAlbum = true
 		case key.Matches(msg, keys.up):
 			ps.moveUp()

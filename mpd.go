@@ -99,7 +99,7 @@ func parseRawEntry(attr mpd.Attrs) rawEntry {
 
 	album := attr["Album"]
 	if album == "" {
-		album = "Unkown Album"
+		album = "Unknown Album"
 	}
 
 	date := 0

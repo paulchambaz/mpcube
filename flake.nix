@@ -3,14 +3,19 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-  }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
     flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = nixpkgs.legacyPackages.${system};
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
         buildPkgs = with pkgs; [
           pkg-config
           scdoc
@@ -23,8 +28,10 @@
           go
           golangci-lint
           vhs
+          claude-code
         ];
-      in {
+      in
+      {
         packages.default = pkgs.buildGoModule {
           pname = "mpcube";
           version = "1.0.0";
@@ -38,7 +45,7 @@
           '';
         };
         devShell = pkgs.mkShell {
-          nativeBuildInputs = buildPkgs ++ [pkgs.go];
+          nativeBuildInputs = buildPkgs ++ [ pkgs.go ];
           buildInputs = libPkgs ++ devPkgs;
         };
       }

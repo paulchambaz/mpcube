@@ -1,7 +1,6 @@
-/target
-/result
 /.direnv
-*.profraw
-tarpaulin*
 *.bin
 /mpcube
+.git
+CLAUDE.md
+ROADMAP.md

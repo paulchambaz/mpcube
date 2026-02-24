@@ -15,7 +15,7 @@ func main() {
 
 	client, err := NewMPDClient(config.MPDHost, config.MPDPort)
 	if err != nil {
-		fmt.Print("Failed to connect to mpd: %w\n", err)
+		fmt.Printf("Failed to connect to mpd: %v\n", err)
 		os.Exit(1)
 	}
 	defer client.Close()
