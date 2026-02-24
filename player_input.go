@@ -2,14 +2,28 @@ package main
 
 import (
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func bindingHelp(b key.Binding) helpEntry {
+	keys := make([]string, len(b.Keys()))
+	for i, k := range b.Keys() {
+		if k == " " {
+			keys[i] = "█"
+		} else {
+			keys[i] = k
+		}
+	}
+	return helpEntry{strings.Join(keys, ", "), b.Help().Desc}
+}
+
 type globalKeyMap struct {
 	forceQuit    key.Binding
+	help         key.Binding
 	seekForward  key.Binding
 	seekBackward key.Binding
 	volumeUp     key.Binding
@@ -18,10 +32,11 @@ type globalKeyMap struct {
 
 var globalKeys = globalKeyMap{
 	forceQuit:    key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
+	help:         key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
 	seekForward:  key.NewBinding(key.WithKeys("."), key.WithHelp(".", "seek forward")),
 	seekBackward: key.NewBinding(key.WithKeys(","), key.WithHelp(",", "seek backward")),
 	volumeUp:     key.NewBinding(key.WithKeys("=", "+"), key.WithHelp("+", "volume up")),
-	volumeDown:   key.NewBinding(key.WithKeys("-"), key.WithHelp("-", "volume down")),
+	volumeDown:   key.NewBinding(key.WithKeys("-", "_"), key.WithHelp("-", "volume down")),
 }
 
 type normalKeyMap struct {
@@ -52,16 +67,43 @@ var normalKeys = normalKeyMap{
 	down:          key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
 	top:           key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
 	bottom:        key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
-	enter:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "play")),
+	enter:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "start")),
 	playPause:     key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
 	next:          key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next track")),
-	prev:          key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "prev track")),
+	prev:          key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "previous track")),
 	clear:         key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "clear")),
 	toggleShuffle: key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "shuffle")),
 	toggleRepeat:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "repeat")),
 	update:        key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "update")),
 	random:        key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "random")),
 	search:        key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+}
+
+func (k normalKeyMap) bindings() []helpEntry {
+	return []helpEntry{
+		{"q, Q, ctrl+c", "quit"},
+		bindingHelp(k.left),
+		bindingHelp(k.right),
+		bindingHelp(k.up),
+		bindingHelp(k.down),
+		bindingHelp(k.top),
+		bindingHelp(k.bottom),
+		bindingHelp(k.enter),
+		bindingHelp(k.playPause),
+		bindingHelp(k.next),
+		bindingHelp(k.prev),
+		bindingHelp(k.clear),
+		bindingHelp(k.toggleShuffle),
+		bindingHelp(k.toggleRepeat),
+		bindingHelp(k.update),
+		bindingHelp(k.random),
+		bindingHelp(k.search),
+		bindingHelp(globalKeys.seekForward),
+		bindingHelp(globalKeys.seekBackward),
+		bindingHelp(globalKeys.volumeUp),
+		bindingHelp(globalKeys.volumeDown),
+		{"?", "help"},
+	}
 }
 
 type searchingKeyMap struct {
@@ -76,7 +118,7 @@ type searchingKeyMap struct {
 
 var searchingKeys = searchingKeyMap{
 	nextMatch: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),
-	prevMatch: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "prev match")),
+	prevMatch: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "previous match")),
 	confirm:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "play album")),
 	cancel:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 	reSearch:  key.NewBinding(key.WithKeys("/", "i"), key.WithHelp("/", "edit query")),
@@ -84,10 +126,32 @@ var searchingKeys = searchingKeyMap{
 	quit:      key.NewBinding(key.WithKeys("q", "Q"), key.WithHelp("q", "quit")),
 }
 
+func (k searchingKeyMap) bindings() []helpEntry {
+	return []helpEntry{
+		{"q, Q, ctrl+c", "quit"},
+		bindingHelp(k.nextMatch),
+		bindingHelp(k.prevMatch),
+		bindingHelp(k.confirm),
+		bindingHelp(k.cancel),
+		bindingHelp(k.reSearch),
+		{"?", "help"},
+	}
+}
+
 func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if key.Matches(msg, globalKeys.forceQuit) {
 		_ = ps.clear()
 		return ps, tea.Quit
+	}
+
+	if key.Matches(msg, globalKeys.help) {
+		if ps.mode == ModeHelp {
+			ps.mode = ps.helpForMode
+			return ps, nil
+		}
+		ps.helpForMode = ps.mode
+		ps.mode = ModeHelp
+		return ps, nil
 	}
 
 	switch {
@@ -112,6 +176,8 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps.handleSearch(msg)
 	case ModeSearching:
 		return ps.handleSearching(msg)
+	case ModeHelp:
+		return ps.handleHelp(msg)
 	}
 	return ps, nil
 }
@@ -197,6 +263,13 @@ func (ps *PlayerState) handleSearching(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, searchingKeys.quit):
 		_ = ps.clear()
 		return ps, tea.Quit
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleHelp(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Type == tea.KeyEscape || msg.String() == "q" || msg.String() == "Q" {
+		ps.mode = ps.helpForMode
 	}
 	return ps, nil
 }

@@ -218,6 +218,9 @@ a given mode.
 The default mode is *normal* mode, which is used for browsing and playback
 control. Other modes are entered and exited through specific key bindings.
 
+Pressing *?* in any mode opens a help overlay showing the keybindings available
+in that mode. Press *?*, *q* or *Escape* to dismiss it.
+
 # SEARCH
 
 Pressing */* in normal mode enters *search* mode. The information bar is
@@ -258,6 +261,7 @@ the selected album, *Escape* to cancel and return to your previous position, or
 - *R* - Play one album at random
 - */* - Enter search mode
 - *q*, *Q* - Quits *mpcube* and clears the *mpd* queue
+- *?* - Show help
 
 ## Search mode
 
@@ -265,6 +269,7 @@ the selected album, *Escape* to cancel and return to your previous position, or
 - *Backspace* - Deletes the last character from the query
 - *Enter* - Confirms the search and enters searching mode
 - *Escape* - Cancels the search and restores your previous position
+- *?* - Show help
 
 ## Searching mode
 
@@ -275,13 +280,14 @@ the selected album, *Escape* to cancel and return to your previous position, or
 - */* , *i* - Edit the search query
 - *Space* - Toggle play / pause
 - *q*, *Q* - Quits *mpcube* and clears the *mpd* queue
+- *?* - Show help
 
 ## All modes
 
 - *.* - Seek forward by 5 seconds
 - *,* - Seek backward by 5 seconds
 - *=* - Increase volume by 10 percent
-- *-* - Decrease volume by 10 percent
+- *-*, *_* - Decrease volume by 10 percent
 - *Ctrl+c* - Quits *mpcube* and clears the *mpd* queue
 
 # AUTHORS

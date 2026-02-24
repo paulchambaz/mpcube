@@ -8,9 +8,126 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+type helpEntry struct {
+	key  string
+	desc string
+}
+
+var searchHelpEntries = []helpEntry{
+	{"ctrl+c", "quit"},
+	{"esc", "cancel"},
+	{"enter", "confirm"},
+	{"backspace", "delete"},
+	{"?", "help"},
+}
+
+func (ps *PlayerState) renderHelp() string {
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
+
+	var entries []helpEntry
+	var modeLabel string
+	switch ps.helpForMode {
+	case ModeNormal:
+		modeLabel = "Normal"
+		entries = normalKeys.bindings()
+	case ModeSearch:
+		modeLabel = "Search"
+		entries = searchHelpEntries
+	case ModeSearching:
+		modeLabel = "Searching"
+		entries = searchingKeys.bindings()
+	}
+
+	maxKeyWidth := 0
+	maxDescWidth := 0
+	for _, e := range entries {
+		if len(e.key) > maxKeyWidth {
+			maxKeyWidth = len(e.key)
+		}
+		if len(e.desc) > maxDescWidth {
+			maxDescWidth = len(e.desc)
+		}
+	}
+
+	colGap := 6
+	colWidth := maxKeyWidth + 2 + maxDescWidth
+	availableHeight := ps.windowHeight - 4
+	entriesPerCol := max(1, availableHeight/2)
+	numCols := max(1, (len(entries)+entriesPerCol-1)/entriesPerCol)
+	entriesPerCol = (len(entries) + numCols - 1) / numCols
+
+	cellStyle := lipgloss.NewStyle().Width(colWidth)
+
+	columns := make([][]string, numCols)
+	for i, e := range entries {
+		col := i / entriesPerCol
+		padKey := fmt.Sprintf("%*s", maxKeyWidth, e.key)
+		line := keyStyle.Render(padKey) + "  " + descStyle.Render(e.desc)
+		columns[col] = append(columns[col], cellStyle.Render(line))
+		columns[col] = append(columns[col], cellStyle.Render(""))
+	}
+
+	maxColHeight := 0
+	for _, col := range columns {
+		if len(col) > maxColHeight {
+			maxColHeight = len(col)
+		}
+	}
+	for i := range columns {
+		for len(columns[i]) < maxColHeight {
+			columns[i] = append(columns[i], cellStyle.Render(""))
+		}
+	}
+
+	gap := strings.Repeat(" ", colGap)
+	var contentLines []string
+	for row := 0; row < maxColHeight; row++ {
+		var parts []string
+		for _, col := range columns {
+			parts = append(parts, col[row])
+		}
+		contentLines = append(contentLines, strings.Join(parts, gap))
+	}
+
+	titleText := modeLabel + " Mode"
+	title := titleStyle.Render(titleText)
+	titlePad := max(0, (ps.windowWidth-len(titleText))/2)
+
+	allLines := []string{strings.Repeat(" ", titlePad) + title, ""}
+	allLines = append(allLines, contentLines...)
+
+	totalHeight := len(allLines)
+	topPad := max(0, (ps.windowHeight-totalHeight)/2)
+
+	totalWidth := numCols*colWidth + (numCols-1)*colGap
+	leftPad := max(0, (ps.windowWidth-totalWidth)/2)
+	padStr := strings.Repeat(" ", leftPad)
+
+	var result []string
+	for i := 0; i < topPad; i++ {
+		result = append(result, "")
+	}
+	result = append(result, allLines[0]) // title already padded
+	result = append(result, allLines[1]) // blank line
+	for _, line := range allLines[2:] {
+		result = append(result, padStr+line)
+	}
+
+	return lipgloss.NewStyle().
+		Width(ps.windowWidth).
+		Height(ps.windowHeight).
+		Render(strings.Join(result, "\n"))
+}
+
 func (ps *PlayerState) View() string {
 	if ps.windowWidth == 0 || ps.windowHeight == 0 {
 		return "Loading..."
+	}
+
+	if ps.mode == ModeHelp {
+		return ps.renderHelp()
 	}
 
 	leftWidth := 0

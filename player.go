@@ -15,6 +15,7 @@ const (
 	ModeNormal Mode = iota
 	ModeSearch
 	ModeSearching
+	ModeHelp
 )
 
 type PlayerState struct {
@@ -24,8 +25,9 @@ type PlayerState struct {
 
 	windowWidth  int
 	windowHeight int
-	onAlbum      bool
-	mode         Mode
+	onAlbum     bool
+	mode        Mode
+	helpForMode Mode
 
 	albumSelected int
 	albumOffset   int
