@@ -5,9 +5,26 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
-type keyMap struct {
+type globalKeyMap struct {
+	forceQuit    key.Binding
+	seekForward  key.Binding
+	seekBackward key.Binding
+	volumeUp     key.Binding
+	volumeDown   key.Binding
+}
+
+var globalKeys = globalKeyMap{
+	forceQuit:    key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
+	seekForward:  key.NewBinding(key.WithKeys("."), key.WithHelp(".", "seek forward")),
+	seekBackward: key.NewBinding(key.WithKeys(","), key.WithHelp(",", "seek backward")),
+	volumeUp:     key.NewBinding(key.WithKeys("=", "+"), key.WithHelp("+", "volume up")),
+	volumeDown:   key.NewBinding(key.WithKeys("-"), key.WithHelp("-", "volume down")),
+}
+
+type normalKeyMap struct {
 	quit          key.Binding
 	left          key.Binding
 	right         key.Binding
@@ -16,41 +33,172 @@ type keyMap struct {
 	top           key.Binding
 	bottom        key.Binding
 	enter         key.Binding
-	space         key.Binding
+	playPause     key.Binding
 	next          key.Binding
 	prev          key.Binding
-	volumeUp      key.Binding
-	volumeDown    key.Binding
 	clear         key.Binding
-	seekForward   key.Binding
-	seekBackward  key.Binding
 	toggleShuffle key.Binding
 	toggleRepeat  key.Binding
 	update        key.Binding
 	random        key.Binding
+	search        key.Binding
 }
 
-var keys = keyMap{
-	quit:          key.NewBinding(key.WithKeys("q", "Q", "ctrl+c"), key.WithHelp("q", "quit")),
-	left:          key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("h", "switch to albums")),
-	right:         key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("l", "switch to titles")),
+var normalKeys = normalKeyMap{
+	quit:          key.NewBinding(key.WithKeys("q", "Q"), key.WithHelp("q", "quit")),
+	left:          key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("h", "albums")),
+	right:         key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("l", "tracks")),
 	up:            key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
 	down:          key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
 	top:           key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
 	bottom:        key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
 	enter:         key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "play")),
-	space:         key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "pause/play")),
-	next:          key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next")),
-	prev:          key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "previous")),
-	volumeUp:      key.NewBinding(key.WithKeys("=", "+"), key.WithHelp("+", "volume up")),
-	volumeDown:    key.NewBinding(key.WithKeys("-"), key.WithHelp("-", "volume down")),
-	clear:         key.NewBinding(key.WithKeys("x"), key.WithHelp("-", "clear")),
-	seekForward:   key.NewBinding(key.WithKeys("."), key.WithHelp(".", "seek forward")),
-	seekBackward:  key.NewBinding(key.WithKeys(","), key.WithHelp(",", "seek backward")),
+	playPause:     key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
+	next:          key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next track")),
+	prev:          key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "prev track")),
+	clear:         key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "clear")),
 	toggleShuffle: key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "shuffle")),
 	toggleRepeat:  key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "repeat")),
 	update:        key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "update")),
 	random:        key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "random")),
+	search:        key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+}
+
+type searchingKeyMap struct {
+	nextMatch key.Binding
+	prevMatch key.Binding
+	confirm   key.Binding
+	cancel    key.Binding
+	reSearch  key.Binding
+	playPause key.Binding
+	quit      key.Binding
+}
+
+var searchingKeys = searchingKeyMap{
+	nextMatch: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),
+	prevMatch: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "prev match")),
+	confirm:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "play album")),
+	cancel:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+	reSearch:  key.NewBinding(key.WithKeys("/", "i"), key.WithHelp("/", "edit query")),
+	playPause: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
+	quit:      key.NewBinding(key.WithKeys("q", "Q"), key.WithHelp("q", "quit")),
+}
+
+func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, globalKeys.forceQuit) {
+		_ = ps.clear()
+		return ps, tea.Quit
+	}
+
+	switch {
+	case key.Matches(msg, globalKeys.seekForward):
+		_ = ps.seekForward()
+		return ps, nil
+	case key.Matches(msg, globalKeys.seekBackward):
+		_ = ps.seekBackward()
+		return ps, nil
+	case key.Matches(msg, globalKeys.volumeUp):
+		_ = ps.volumeUp()
+		return ps, nil
+	case key.Matches(msg, globalKeys.volumeDown):
+		_ = ps.volumeDown()
+		return ps, nil
+	}
+
+	switch ps.mode {
+	case ModeNormal:
+		return ps.handleNormal(msg)
+	case ModeSearch:
+		return ps.handleSearch(msg)
+	case ModeSearching:
+		return ps.handleSearching(msg)
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, normalKeys.quit):
+		_ = ps.clear()
+		return ps, tea.Quit
+	case key.Matches(msg, normalKeys.right):
+		ps.onAlbum = false
+		if len(ps.musicData.Albums) > 0 {
+			lastTrack := len(ps.musicData.Albums[ps.albumSelected].Songs) - 1
+			if ps.trackSelected > lastTrack {
+				ps.trackSelected = lastTrack
+			}
+			if ps.trackOffset > lastTrack {
+				ps.trackOffset = max(0, lastTrack-ps.windowHeight+5)
+			}
+		}
+	case key.Matches(msg, normalKeys.left):
+		ps.onAlbum = true
+	case key.Matches(msg, normalKeys.up):
+		ps.moveUp()
+	case key.Matches(msg, normalKeys.down):
+		ps.moveDown()
+	case key.Matches(msg, normalKeys.top):
+		ps.moveTop()
+	case key.Matches(msg, normalKeys.bottom):
+		ps.moveBottom()
+	case key.Matches(msg, normalKeys.enter):
+		_ = ps.playSelected()
+	case key.Matches(msg, normalKeys.playPause):
+		_ = ps.togglePlayPause()
+	case key.Matches(msg, normalKeys.next):
+		_ = ps.nextTrack()
+	case key.Matches(msg, normalKeys.prev):
+		_ = ps.prevTrack()
+	case key.Matches(msg, normalKeys.clear):
+		_ = ps.clear()
+	case key.Matches(msg, normalKeys.toggleShuffle):
+		_ = ps.toggleShuffle()
+	case key.Matches(msg, normalKeys.toggleRepeat):
+		_ = ps.toggleRepeat()
+	case key.Matches(msg, normalKeys.update):
+		_ = ps.update()
+	case key.Matches(msg, normalKeys.random):
+		_ = ps.random()
+	case key.Matches(msg, normalKeys.search):
+		ps.enterSearch()
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEscape:
+		ps.cancelSearch()
+	case tea.KeyEnter:
+		ps.confirmSearch()
+	case tea.KeyBackspace:
+		ps.searchBackspace()
+	case tea.KeyRunes:
+		ps.searchAddRune(msg.Runes[0])
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleSearching(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, searchingKeys.nextMatch):
+		ps.nextMatch()
+	case key.Matches(msg, searchingKeys.prevMatch):
+		ps.prevMatch()
+	case key.Matches(msg, searchingKeys.confirm):
+		ps.confirmSearching()
+	case key.Matches(msg, searchingKeys.cancel):
+		ps.cancelSearch()
+	case key.Matches(msg, searchingKeys.reSearch):
+		ps.mode = ModeSearch
+	case key.Matches(msg, searchingKeys.playPause):
+		_ = ps.togglePlayPause()
+	case key.Matches(msg, searchingKeys.quit):
+		_ = ps.clear()
+		return ps, tea.Quit
+	}
+	return ps, nil
 }
 
 func (ps *PlayerState) moveUp() {

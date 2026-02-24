@@ -188,6 +188,13 @@ func (ps *PlayerState) renderTrackPanel(width, height int) string {
 }
 
 func (ps *PlayerState) renderInfoBar(width int) string {
+	switch ps.mode {
+	case ModeSearch:
+		return ps.renderSearchBar(width)
+	case ModeSearching:
+		return ps.renderSearchingBar(width)
+	}
+
 	contentStyle := lipgloss.NewStyle().
 		Width(width).
 		Height(1)
@@ -228,6 +235,36 @@ func (ps *PlayerState) renderInfoBar(width int) string {
 	}
 
 	return contentStyle.Render(fmt.Sprintf("%-*s", width, result))
+}
+
+func (ps *PlayerState) renderSearchBar(width int) string {
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
+
+	query := ps.searchQuery
+	maxQuery := width - 4
+	if len(query) > maxQuery {
+		query = query[len(query)-maxQuery:]
+	}
+
+	text := style.Render(" / "+query) + cursorStyle.Render("█")
+	return lipgloss.NewStyle().Width(width).Height(1).Render(text)
+}
+
+func (ps *PlayerState) renderSearchingBar(width int) string {
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	countStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+
+	count := fmt.Sprintf("[%d/%d]", ps.searchMatchIdx+1, len(ps.searchMatches))
+	query := ps.searchQuery
+	prefix := " " + count + " / "
+	maxQuery := width - len(prefix)
+	if len(query) > maxQuery {
+		query = query[len(query)-maxQuery:]
+	}
+
+	text := " " + countStyle.Render(count) + style.Render(" / "+query)
+	return lipgloss.NewStyle().Width(width).Height(1).Render(text)
 }
 
 func (ps *PlayerState) renderVolumeBar(width int) string {

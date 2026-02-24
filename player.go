@@ -5,9 +5,16 @@ import (
 	"math"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fhs/gompd/v2/mpd"
+)
+
+type Mode int
+
+const (
+	ModeNormal Mode = iota
+	ModeSearch
+	ModeSearching
 )
 
 type PlayerState struct {
@@ -18,6 +25,7 @@ type PlayerState struct {
 	windowWidth  int
 	windowHeight int
 	onAlbum      bool
+	mode         Mode
 
 	albumSelected int
 	albumOffset   int
@@ -32,6 +40,12 @@ type PlayerState struct {
 	volume       int
 	shuffle      bool
 	repeat       bool
+
+	searchQuery       string
+	searchMatches     []int
+	searchMatchIdx    int
+	searchSavedAlbum  int
+	searchSavedOffset int
 
 	retryCount int
 }
@@ -131,58 +145,7 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return ps, ps.tickCmd()
 
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, keys.quit):
-			_ = ps.clear()
-			return ps, tea.Quit
-		case key.Matches(msg, keys.right):
-			ps.onAlbum = false
-			if len(ps.musicData.Albums) > 0 {
-				lastTrack := len(ps.musicData.Albums[ps.albumSelected].Songs) - 1
-				if ps.trackSelected > lastTrack {
-					ps.trackSelected = lastTrack
-				}
-				if ps.trackOffset > lastTrack {
-					ps.trackOffset = max(0, lastTrack-ps.windowHeight+5)
-				}
-			}
-		case key.Matches(msg, keys.left):
-			ps.onAlbum = true
-		case key.Matches(msg, keys.up):
-			ps.moveUp()
-		case key.Matches(msg, keys.down):
-			ps.moveDown()
-		case key.Matches(msg, keys.top):
-			ps.moveTop()
-		case key.Matches(msg, keys.bottom):
-			ps.moveBottom()
-		case key.Matches(msg, keys.enter):
-			_ = ps.playSelected()
-		case key.Matches(msg, keys.space):
-			_ = ps.togglePlayPause()
-		case key.Matches(msg, keys.next):
-			_ = ps.nextTrack()
-		case key.Matches(msg, keys.prev):
-			_ = ps.prevTrack()
-		case key.Matches(msg, keys.volumeUp):
-			_ = ps.volumeUp()
-		case key.Matches(msg, keys.volumeDown):
-			_ = ps.volumeDown()
-		case key.Matches(msg, keys.clear):
-			_ = ps.clear()
-		case key.Matches(msg, keys.seekForward):
-			_ = ps.seekForward()
-		case key.Matches(msg, keys.seekBackward):
-			_ = ps.seekBackward()
-		case key.Matches(msg, keys.toggleShuffle):
-			_ = ps.toggleShuffle()
-		case key.Matches(msg, keys.toggleRepeat):
-			_ = ps.toggleRepeat()
-		case key.Matches(msg, keys.update):
-			_ = ps.update()
-		case key.Matches(msg, keys.random):
-			_ = ps.random()
-		}
+		return ps.handleKeyMsg(msg)
 	}
 	return ps, nil
 }

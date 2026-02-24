@@ -209,31 +209,80 @@ after it has ended. The *Volume* window displays the current volume of the *mpd*
 playback. Finally, the *Bar* window will display the current position in the
 song you are playing.
 
+# MODES
+
+*mpcube* is a modal application. Different modes change how keyboard input is
+interpreted. Some keys are available in all modes, while others are specific to
+a given mode.
+
+The default mode is *normal* mode, which is used for browsing and playback
+control. Other modes are entered and exited through specific key bindings.
+
+# SEARCH
+
+Pressing */* in normal mode enters *search* mode. The information bar is
+replaced by a search prompt. As you type, *mpcube* performs a fuzzy match
+against your library and jumps to the best match. The search matches against
+both *artist album* and *album artist* combinations, so you can type in either
+order. Results are ranked by match quality — consecutive character matches and
+matches at the start of words score higher. You do not need to type special
+characters like hyphens or periods, as the fuzzy matching will skip over them.
+Press *Enter* to confirm your search and enter *searching* mode, or press
+*Escape* to cancel and return to where you were.
+
+In *searching* mode, you can cycle through all matching albums with *n* and *p*.
+The information bar shows your position in the match list. Press *Enter* to play
+the selected album, *Escape* to cancel and return to your previous position, or
+*/* to edit your query.
+
 # KEYBOARD CONTROLS
 
-*mpcube* is designed for efficient keyboard navigation. Here are the key
-bindings:
+*mpcube* is designed for efficient keyboard navigation.
+
+## Normal mode
 
 - *j*, *Down* - Move down the list in the *Album* or *Title* window
 - *k*, *Up* - Move up the list in the *Album* or *Title* window
 - *l*, *Right* - Move to the *Title* window from the *Album* window
 - *h*, *Left* - Move to the *Album* window from the *Title* window
+- *g*, *Home* - Go to top of list
+- *G*, *End* - Go to bottom of list
 - *Enter* - Start an album in the *Album* window, a song in the *Title* window
 - *Space* - Toggle play / pause
 - *n* - Play the next track
 - *p* - Play the previous track
-- *=* - Increase volume by 10 percent
-- *-* - Decrease volume by 10 percent
 - *x* - Clears the *mpd* queue
-- *.* - Seek forward by 5 seconds
-- *,* - Seek backward by 5 seconds
 - *s* - Toggle *shuffle* mode
 - *r* - Toggle *repeat* mode
 - *U* - Full scan of the *mpd* database
 - *R* - Play one album at random
-- *g*, *Home* - Go to top of list
-- *G*, *End* - Go to bottom of list
-- *q*, *Q*, *Ctrl+c* - Quits *mpcube* and clears the *mpd* queue
+- */* - Enter search mode
+- *q*, *Q* - Quits *mpcube* and clears the *mpd* queue
+
+## Search mode
+
+- Typing - Appends to the search query, jumps to best match
+- *Backspace* - Deletes the last character from the query
+- *Enter* - Confirms the search and enters searching mode
+- *Escape* - Cancels the search and restores your previous position
+
+## Searching mode
+
+- *n* - Jump to the next match
+- *p* - Jump to the previous match
+- *Enter* - Play the selected album and return to normal mode
+- *Escape* - Cancel and restore your previous position
+- */* , *i* - Edit the search query
+- *Space* - Toggle play / pause
+- *q*, *Q* - Quits *mpcube* and clears the *mpd* queue
+
+## All modes
+
+- *.* - Seek forward by 5 seconds
+- *,* - Seek backward by 5 seconds
+- *=* - Increase volume by 10 percent
+- *-* - Decrease volume by 10 percent
+- *Ctrl+c* - Quits *mpcube* and clears the *mpd* queue
 
 # AUTHORS
 
