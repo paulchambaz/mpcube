@@ -55,7 +55,11 @@ func (ps *PlayerState) renderHelp() string {
 	colWidth := maxKeyWidth + 2 + maxDescWidth
 	availableHeight := ps.windowHeight - 4
 	entriesPerCol := max(1, availableHeight/2)
-	numCols := max(1, (len(entries)+entriesPerCol-1)/entriesPerCol)
+	minCols := 1
+	if len(entries) > 10 {
+		minCols = 2
+	}
+	numCols := max(minCols, (len(entries)+entriesPerCol-1)/entriesPerCol)
 	entriesPerCol = (len(entries) + numCols - 1) / numCols
 
 	cellStyle := lipgloss.NewStyle().Width(colWidth)

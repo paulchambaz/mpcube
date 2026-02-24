@@ -226,17 +226,21 @@ in that mode. Press *?*, *q* or *Escape* to dismiss it.
 Pressing */* in normal mode enters *search* mode. The information bar is
 replaced by a search prompt. As you type, *mpcube* performs a fuzzy match
 against your library and jumps to the best match. The search matches against
-both *artist album* and *album artist* combinations, so you can type in either
-order. Results are ranked by match quality — consecutive character matches and
-matches at the start of words score higher. You do not need to type special
-characters like hyphens or periods, as the fuzzy matching will skip over them.
+both *artist - album* and *album - artist* combinations, so you can type in
+either order. Typing a dash after an artist name (e.g. "the beatles -")
+restricts results to that artist. Results are ranked by match quality —
+consecutive character matches and matches at the start of words score higher.
 Press *Enter* to confirm your search and enter *searching* mode, or press
 *Escape* to cancel and return to where you were.
 
 In *searching* mode, you can cycle through all matching albums with *n* and *p*.
-The information bar shows your position in the match list. Press *Enter* to play
-the selected album, *Escape* to cancel and return to your previous position, or
-*/* to edit your query.
+The information bar shows your position in the match list. You can press *l* or
+*h* to switch between the *Album* and *Title* columns, and use *j*, *k*, *g*,
+*G* to navigate within the *Title* column. Press *Enter* to play the selected
+album or track depending on which column you are in. Press *Escape* to cancel
+and return to your previous position. Press *L* to exit search and land on the
+*Title* column at the current position, or *H* to exit and land on the *Album*
+column. Press */* or *i* to edit your query.
 
 # KEYBOARD CONTROLS
 
@@ -258,7 +262,7 @@ the selected album, *Escape* to cancel and return to your previous position, or
 - *s* - Toggle *shuffle* mode
 - *r* - Toggle *repeat* mode
 - *U* - Full scan of the *mpd* database
-- *R* - Play one album at random
+- *R* - Play a random album in the *Album* column, or a random track in the *Title* column
 - */* - Enter search mode
 - *q*, *Q* - Quits *mpcube* and clears the *mpd* queue
 - *?* - Show help
@@ -273,11 +277,19 @@ the selected album, *Escape* to cancel and return to your previous position, or
 
 ## Searching mode
 
+- *h*, *Left* - Move to the *Album* column
+- *l*, *Right* - Move to the *Title* column
+- *j*, *k*, *Up*, *Down* - Move up and down in the *Title* column
+- *g*, *Home* - Go to top in the *Title* column
+- *G*, *End* - Go to bottom in the *Title* column
 - *n* - Jump to the next match
 - *p* - Jump to the previous match
-- *Enter* - Play the selected album and return to normal mode
+- *Enter* - Play the selected album or track and return to normal mode
 - *Escape* - Cancel and restore your previous position
+- *L* - Exit search to the *Title* column, keeping current position
+- *H* - Exit search to the *Album* column, keeping current position
 - */* , *i* - Edit the search query
+- *R* - Play a random album from matches, or a random track from the current album
 - *Space* - Toggle play / pause
 - *q*, *Q* - Quits *mpcube* and clears the *mpd* queue
 - *?* - Show help

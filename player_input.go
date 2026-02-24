@@ -107,33 +107,60 @@ func (k normalKeyMap) bindings() []helpEntry {
 }
 
 type searchingKeyMap struct {
-	nextMatch key.Binding
-	prevMatch key.Binding
-	confirm   key.Binding
-	cancel    key.Binding
-	reSearch  key.Binding
-	playPause key.Binding
-	quit      key.Binding
+	nextMatch     key.Binding
+	prevMatch     key.Binding
+	confirm       key.Binding
+	cancel        key.Binding
+	exitKeepRight key.Binding
+	exitKeepLeft  key.Binding
+	reSearch      key.Binding
+	playPause     key.Binding
+	quit          key.Binding
+	left          key.Binding
+	right         key.Binding
+	up            key.Binding
+	down          key.Binding
+	top           key.Binding
+	bottom        key.Binding
+	random        key.Binding
 }
 
 var searchingKeys = searchingKeyMap{
 	nextMatch: key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "next match")),
 	prevMatch: key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "previous match")),
-	confirm:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "play album")),
+	confirm:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "play")),
 	cancel:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+	exitKeepRight: key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "exit to tracks")),
+	exitKeepLeft:  key.NewBinding(key.WithKeys("H"), key.WithHelp("H", "exit to album")),
 	reSearch:  key.NewBinding(key.WithKeys("/", "i"), key.WithHelp("/", "edit query")),
 	playPause: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
 	quit:      key.NewBinding(key.WithKeys("q", "Q"), key.WithHelp("q", "quit")),
+	left:      key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("h", "albums")),
+	right:     key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("l", "tracks")),
+	up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
+	down:      key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
+	top:       key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
+	bottom:    key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
+	random:    key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "random")),
 }
 
 func (k searchingKeyMap) bindings() []helpEntry {
 	return []helpEntry{
 		{"q, Q, ctrl+c", "quit"},
+		bindingHelp(k.left),
+		bindingHelp(k.right),
+		bindingHelp(k.up),
+		bindingHelp(k.down),
+		bindingHelp(k.top),
+		bindingHelp(k.bottom),
 		bindingHelp(k.nextMatch),
 		bindingHelp(k.prevMatch),
 		bindingHelp(k.confirm),
 		bindingHelp(k.cancel),
+		bindingHelp(k.exitKeepRight),
+		bindingHelp(k.exitKeepLeft),
 		bindingHelp(k.reSearch),
+		bindingHelp(k.random),
 		{"?", "help"},
 	}
 }
@@ -154,19 +181,21 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps, nil
 	}
 
-	switch {
-	case key.Matches(msg, globalKeys.seekForward):
-		_ = ps.seekForward()
-		return ps, nil
-	case key.Matches(msg, globalKeys.seekBackward):
-		_ = ps.seekBackward()
-		return ps, nil
-	case key.Matches(msg, globalKeys.volumeUp):
-		_ = ps.volumeUp()
-		return ps, nil
-	case key.Matches(msg, globalKeys.volumeDown):
-		_ = ps.volumeDown()
-		return ps, nil
+	if ps.mode != ModeSearch {
+		switch {
+		case key.Matches(msg, globalKeys.seekForward):
+			_ = ps.seekForward()
+			return ps, nil
+		case key.Matches(msg, globalKeys.seekBackward):
+			_ = ps.seekBackward()
+			return ps, nil
+		case key.Matches(msg, globalKeys.volumeUp):
+			_ = ps.volumeUp()
+			return ps, nil
+		case key.Matches(msg, globalKeys.volumeDown):
+			_ = ps.volumeDown()
+			return ps, nil
+		}
 	}
 
 	switch ps.mode {
@@ -240,6 +269,8 @@ func (ps *PlayerState) handleSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.confirmSearch()
 	case tea.KeyBackspace:
 		ps.searchBackspace()
+	case tea.KeySpace:
+		ps.searchAddRune(' ')
 	case tea.KeyRunes:
 		ps.searchAddRune(msg.Runes[0])
 	}
@@ -249,13 +280,21 @@ func (ps *PlayerState) handleSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (ps *PlayerState) handleSearching(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, searchingKeys.nextMatch):
+		ps.onAlbum = true
 		ps.nextMatch()
 	case key.Matches(msg, searchingKeys.prevMatch):
+		ps.onAlbum = true
 		ps.prevMatch()
 	case key.Matches(msg, searchingKeys.confirm):
 		ps.confirmSearching()
 	case key.Matches(msg, searchingKeys.cancel):
 		ps.cancelSearch()
+	case key.Matches(msg, searchingKeys.exitKeepRight):
+		ps.onAlbum = false
+		ps.exitSearchKeep()
+	case key.Matches(msg, searchingKeys.exitKeepLeft):
+		ps.onAlbum = true
+		ps.exitSearchKeep()
 	case key.Matches(msg, searchingKeys.reSearch):
 		ps.mode = ModeSearch
 	case key.Matches(msg, searchingKeys.playPause):
@@ -263,6 +302,30 @@ func (ps *PlayerState) handleSearching(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, searchingKeys.quit):
 		_ = ps.clear()
 		return ps, tea.Quit
+	case key.Matches(msg, searchingKeys.right):
+		ps.onAlbum = false
+		if len(ps.musicData.Albums) > 0 {
+			lastTrack := len(ps.musicData.Albums[ps.albumSelected].Songs) - 1
+			if ps.trackSelected > lastTrack {
+				ps.trackSelected = lastTrack
+			}
+			if ps.trackOffset > lastTrack {
+				ps.trackOffset = max(0, lastTrack-ps.windowHeight+5)
+			}
+		}
+	case key.Matches(msg, searchingKeys.left):
+		ps.onAlbum = true
+	case key.Matches(msg, searchingKeys.up) && !ps.onAlbum:
+		ps.moveUp()
+	case key.Matches(msg, searchingKeys.down) && !ps.onAlbum:
+		ps.moveDown()
+	case key.Matches(msg, searchingKeys.top) && !ps.onAlbum:
+		ps.moveTop()
+	case key.Matches(msg, searchingKeys.bottom) && !ps.onAlbum:
+		ps.moveBottom()
+	case key.Matches(msg, searchingKeys.random):
+		_ = ps.random()
+		ps.mode = ModeNormal
 	}
 	return ps, nil
 }
@@ -571,7 +634,18 @@ func (ps *PlayerState) random() error {
 	if len(ps.musicData.Albums) == 0 {
 		return nil
 	}
-	albumIdx := rand.Intn(len(ps.musicData.Albums))
 
-	return ps.playAlbum(albumIdx)
+	if ps.onAlbum {
+		if ps.mode == ModeSearching && len(ps.searchMatches) > 0 {
+			albumIdx := ps.searchMatches[rand.Intn(len(ps.searchMatches))]
+			return ps.playAlbum(albumIdx)
+		}
+		return ps.playAlbum(rand.Intn(len(ps.musicData.Albums)))
+	}
+
+	album := ps.musicData.Albums[ps.albumSelected]
+	if len(album.Songs) == 0 {
+		return nil
+	}
+	return ps.playTrack(ps.albumSelected, rand.Intn(len(album.Songs)))
 }

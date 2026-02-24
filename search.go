@@ -3,11 +3,24 @@ package main
 import (
 	"sort"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
+func stripAccents(s string) string {
+	var b strings.Builder
+	for _, r := range norm.NFD.String(s) {
+		if !unicode.Is(unicode.Mn, r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 func fuzzyScore(query, target string) int {
-	query = strings.ToLower(query)
-	target = strings.ToLower(target)
+	query = strings.ToLower(stripAccents(query))
+	target = strings.ToLower(stripAccents(target))
 	qi := 0
 	score := 0
 	prevIdx := -1
@@ -46,8 +59,8 @@ func (ps *PlayerState) runSearch() {
 	var results []result
 
 	for i, album := range ps.musicData.Albums {
-		s1 := fuzzyScore(ps.searchQuery, album.Artist+" "+album.Album)
-		s2 := fuzzyScore(ps.searchQuery, album.Album+" "+album.Artist)
+		s1 := fuzzyScore(ps.searchQuery, album.Artist+" - "+album.Album)
+		s2 := fuzzyScore(ps.searchQuery, album.Album+" - "+album.Artist)
 		score := max(s1, s2)
 		if score >= 0 {
 			results = append(results, result{i, score})
@@ -144,6 +157,12 @@ func (ps *PlayerState) prevMatch() {
 }
 
 func (ps *PlayerState) confirmSearching() {
-	_ = ps.playAlbum(ps.albumSelected)
+	_ = ps.playSelected()
+	ps.mode = ModeNormal
+}
+
+func (ps *PlayerState) exitSearchKeep() {
+	ps.searchQuery = ""
+	ps.searchMatches = nil
 	ps.mode = ModeNormal
 }
