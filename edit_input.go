@@ -20,29 +20,29 @@ type editCenterKeyMap struct {
 	bottom    key.Binding
 	edit      key.Binding
 	editor    key.Binding
-	sync       key.Binding
-	revert     key.Binding
-	revertAll  key.Binding
-	playPause  key.Binding
-	search     key.Binding
-	openCover  key.Binding
+	sync      key.Binding
+	revert    key.Binding
+	revertAll key.Binding
+	playPause key.Binding
+	search    key.Binding
+	openCover key.Binding
 }
 
 var editCenterKeys = editCenterKeyMap{
-	quit:       key.NewBinding(key.WithKeys("q", "esc"), key.WithHelp("q", "discard")),
-	left:       key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h", "panels")),
-	up:         key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
-	down:       key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
-	top:        key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
-	bottom:     key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
-	edit:       key.NewBinding(key.WithKeys("i", "enter"), key.WithHelp("i", "edit field")),
-	editor:     key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "editor")),
-	sync:       key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sync filenames")),
-	revert:     key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "revert")),
-	revertAll:  key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "revert all")),
-	playPause:  key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
-	search:     key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
-	openCover:  key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open cover")),
+	quit:      key.NewBinding(key.WithKeys("q", "esc"), key.WithHelp("q", "discard")),
+	left:      key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h", "panels")),
+	up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
+	down:      key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
+	top:       key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
+	bottom:    key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
+	edit:      key.NewBinding(key.WithKeys("i", "enter"), key.WithHelp("i", "edit field")),
+	editor:    key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "editor")),
+	sync:      key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sync filenames")),
+	revert:    key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "revert")),
+	revertAll: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "revert all")),
+	playPause: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
+	search:    key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+	openCover: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open cover")),
 }
 
 func (k editCenterKeyMap) bindings() []helpEntry {
@@ -149,9 +149,7 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, editCenterKeys.search):
 		ps.editEnterSearch()
 	case key.Matches(msg, editCenterKeys.openCover):
-		if ps.editFieldIdx == 4 {
-			ps.editOpenCover()
-		}
+		ps.editOpenCover()
 	}
 	return ps, nil
 }
