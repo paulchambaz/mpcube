@@ -32,6 +32,7 @@ type editCenterKeyMap struct {
 var editCenterKeys = editCenterKeyMap{
 	quit:      key.NewBinding(key.WithKeys("q", "esc"), key.WithHelp("q", "discard")),
 	left:      key.NewBinding(key.WithKeys("h", "left"), key.WithHelp("h", "panels")),
+	right:     key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l", "panels")),
 	up:        key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
 	down:      key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
 	top:       key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),

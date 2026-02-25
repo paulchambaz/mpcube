@@ -168,7 +168,7 @@ func (ps *PlayerState) renderEditEmptyPanel(title string, width, height int, foc
 }
 
 func (ps *PlayerState) renderEditCenterPanel(width, height int) string {
-	focused := ps.editFocus == EditFocusCenter || ps.mode == ModeEditTerminal
+	focused := ps.editFocus == EditFocusCenter
 	var borderColor lipgloss.Color
 	if focused {
 		borderColor = lipgloss.Color("9")
