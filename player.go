@@ -16,6 +16,10 @@ const (
 	ModeSearch
 	ModeSearching
 	ModeHelp
+	ModeEdit
+	ModeEditInput
+	ModeEditSearch
+	ModeEditSearching
 )
 
 type PlayerState struct {
@@ -50,6 +54,18 @@ type PlayerState struct {
 	searchSavedOffset int
 
 	retryCount int
+
+	editFocus       EditFocus
+	editFieldIdx    int
+	editFieldOffset int
+	editTitleIdx    int
+	editTitleOffset int
+	editAlbum       [5]string
+	editAlbumOrig   [5]string
+	editTracks      []editTrackState
+	editTracksOrig  []editTrackState
+	editInputBuf    string
+	editInputPos    int
 }
 
 func NewPlayerState(config Config, musicData *MusicData, mpdClient *mpd.Client) (*PlayerState, error) {
@@ -146,8 +162,13 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ps.retryCount = 0
 		return ps, ps.tickCmd()
 
+	case editorFinishedMsg:
+		ps.handleEditorFinished(msg)
+		return ps, nil
+
 	case tea.KeyMsg:
 		return ps.handleKeyMsg(msg)
 	}
 	return ps, nil
 }
+

@@ -166,3 +166,93 @@ func (ps *PlayerState) exitSearchKeep() {
 	ps.searchMatches = nil
 	ps.mode = ModeNormal
 }
+
+func (ps *PlayerState) editEnterSearch() {
+	ps.searchSavedAlbum = ps.albumSelected
+	ps.searchSavedOffset = ps.albumOffset
+	ps.searchQuery = ""
+	ps.searchMatches = nil
+	ps.searchMatchIdx = 0
+	ps.editFocus = EditFocusAlbums
+	ps.mode = ModeEditSearch
+}
+
+func (ps *PlayerState) editCancelSearch() {
+	ps.albumSelected = ps.searchSavedAlbum
+	ps.albumOffset = ps.searchSavedOffset
+	ps.searchQuery = ""
+	ps.searchMatches = nil
+	ps.editLoadAlbum()
+	ps.editFocus = EditFocusAlbums
+	ps.mode = ModeEdit
+}
+
+func (ps *PlayerState) editConfirmSearch() {
+	if ps.searchQuery == "" {
+		ps.editCancelSearch()
+		return
+	}
+	if len(ps.searchMatches) > 0 {
+		ps.mode = ModeEditSearching
+	}
+}
+
+func (ps *PlayerState) editJumpToMatch(idx int) {
+	if len(ps.searchMatches) == 0 {
+		return
+	}
+	ps.searchMatchIdx = idx
+	ps.albumSelected = ps.searchMatches[idx]
+	ps.editAlbumFixOffset()
+	ps.editLoadAlbum()
+}
+
+func (ps *PlayerState) editSearchAddRune(r rune) {
+	ps.searchQuery += string(r)
+	ps.runSearch()
+	if len(ps.searchMatches) > 0 {
+		ps.editJumpToMatch(0)
+	}
+}
+
+func (ps *PlayerState) editSearchBackspace() {
+	if len(ps.searchQuery) > 0 {
+		ps.searchQuery = ps.searchQuery[:len(ps.searchQuery)-1]
+	}
+	if ps.searchQuery == "" {
+		ps.albumSelected = ps.searchSavedAlbum
+		ps.albumOffset = ps.searchSavedOffset
+		ps.editLoadAlbum()
+		return
+	}
+	ps.runSearch()
+	if len(ps.searchMatches) > 0 {
+		ps.editJumpToMatch(0)
+	}
+}
+
+func (ps *PlayerState) editNextMatch() {
+	if len(ps.searchMatches) == 0 {
+		return
+	}
+	idx := (ps.searchMatchIdx + 1) % len(ps.searchMatches)
+	ps.editJumpToMatch(idx)
+}
+
+func (ps *PlayerState) editPrevMatch() {
+	if len(ps.searchMatches) == 0 {
+		return
+	}
+	idx := ps.searchMatchIdx - 1
+	if idx < 0 {
+		idx = len(ps.searchMatches) - 1
+	}
+	ps.editJumpToMatch(idx)
+}
+
+func (ps *PlayerState) editConfirmSearching() {
+	ps.searchQuery = ""
+	ps.searchMatches = nil
+	ps.mode = ModeEdit
+	ps.editFocus = EditFocusCenter
+}

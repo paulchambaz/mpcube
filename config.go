@@ -27,6 +27,8 @@ type Config struct {
 	AlbumWidth         int `toml:"album_width"`
 	VolumeBarThreshold int `toml:"volume_bar_threshold"`
 	VolumeBarWidth     int `toml:"volume_bar_width"`
+
+	MusicDir string `toml:"music_dir"`
 }
 
 func DefaultConfig() Config {
@@ -49,6 +51,9 @@ func LoadConfig() (Config, error) {
 	cfg := DefaultConfig()
 
 	home, err := os.UserHomeDir()
+	if err == nil && cfg.MusicDir == "" {
+		cfg.MusicDir = filepath.Join(home, "music")
+	}
 	if err == nil {
 		configPath := filepath.Join(home, ".config", "mpcube", "config.toml")
 		if _, err := os.Stat(configPath); err == nil {
@@ -111,6 +116,9 @@ func LoadConfig() (Config, error) {
 			cfg.VolumeBarWidth = n
 		}
 	}
+	if v := os.Getenv("MPCUBE_MUSIC_DIR"); v != "" {
+		cfg.MusicDir = v
+	}
 
 	var showVersion bool
 	flag.StringVar(&cfg.MPDHost, "mpd-host", cfg.MPDHost, "MPD host address")
@@ -124,6 +132,7 @@ func LoadConfig() (Config, error) {
 	flag.IntVar(&cfg.AlbumWidth, "album-width", cfg.AlbumWidth, "album panel width in wide layout")
 	flag.IntVar(&cfg.VolumeBarThreshold, "volume-bar-threshold", cfg.VolumeBarThreshold, "terminal width for wide volume bar")
 	flag.IntVar(&cfg.VolumeBarWidth, "volume-bar-width", cfg.VolumeBarWidth, "volume bar width in wide layout")
+	flag.StringVar(&cfg.MusicDir, "music-dir", cfg.MusicDir, "MPD music directory path")
 	flag.BoolVar(&showVersion, "version", false, "print version")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: mpcube [OPTIONS]\n\nOptions:\n")

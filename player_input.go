@@ -2,42 +2,11 @@ package main
 
 import (
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
-
-func bindingHelp(b key.Binding) helpEntry {
-	keys := make([]string, len(b.Keys()))
-	for i, k := range b.Keys() {
-		if k == " " {
-			keys[i] = "█"
-		} else {
-			keys[i] = k
-		}
-	}
-	return helpEntry{strings.Join(keys, ", "), b.Help().Desc}
-}
-
-type globalKeyMap struct {
-	forceQuit    key.Binding
-	help         key.Binding
-	seekForward  key.Binding
-	seekBackward key.Binding
-	volumeUp     key.Binding
-	volumeDown   key.Binding
-}
-
-var globalKeys = globalKeyMap{
-	forceQuit:    key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")),
-	help:         key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
-	seekForward:  key.NewBinding(key.WithKeys("."), key.WithHelp(".", "seek forward")),
-	seekBackward: key.NewBinding(key.WithKeys(","), key.WithHelp(",", "seek backward")),
-	volumeUp:     key.NewBinding(key.WithKeys("=", "+"), key.WithHelp("+", "volume up")),
-	volumeDown:   key.NewBinding(key.WithKeys("-", "_"), key.WithHelp("-", "volume down")),
-}
 
 type normalKeyMap struct {
 	quit          key.Binding
@@ -57,6 +26,7 @@ type normalKeyMap struct {
 	update        key.Binding
 	random        key.Binding
 	search        key.Binding
+	edit          key.Binding
 }
 
 var normalKeys = normalKeyMap{
@@ -77,6 +47,7 @@ var normalKeys = normalKeyMap{
 	update:        key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "update")),
 	random:        key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "random")),
 	search:        key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+	edit:          key.NewBinding(key.WithKeys("E"), key.WithHelp("E", "edit")),
 }
 
 func (k normalKeyMap) bindings() []helpEntry {
@@ -98,6 +69,7 @@ func (k normalKeyMap) bindings() []helpEntry {
 		bindingHelp(k.update),
 		bindingHelp(k.random),
 		bindingHelp(k.search),
+		bindingHelp(k.edit),
 		bindingHelp(globalKeys.seekForward),
 		bindingHelp(globalKeys.seekBackward),
 		bindingHelp(globalKeys.volumeUp),
@@ -165,52 +137,6 @@ func (k searchingKeyMap) bindings() []helpEntry {
 	}
 }
 
-func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, globalKeys.forceQuit) {
-		_ = ps.clear()
-		return ps, tea.Quit
-	}
-
-	if key.Matches(msg, globalKeys.help) {
-		if ps.mode == ModeHelp {
-			ps.mode = ps.helpForMode
-			return ps, nil
-		}
-		ps.helpForMode = ps.mode
-		ps.mode = ModeHelp
-		return ps, nil
-	}
-
-	if ps.mode != ModeSearch {
-		switch {
-		case key.Matches(msg, globalKeys.seekForward):
-			_ = ps.seekForward()
-			return ps, nil
-		case key.Matches(msg, globalKeys.seekBackward):
-			_ = ps.seekBackward()
-			return ps, nil
-		case key.Matches(msg, globalKeys.volumeUp):
-			_ = ps.volumeUp()
-			return ps, nil
-		case key.Matches(msg, globalKeys.volumeDown):
-			_ = ps.volumeDown()
-			return ps, nil
-		}
-	}
-
-	switch ps.mode {
-	case ModeNormal:
-		return ps.handleNormal(msg)
-	case ModeSearch:
-		return ps.handleSearch(msg)
-	case ModeSearching:
-		return ps.handleSearching(msg)
-	case ModeHelp:
-		return ps.handleHelp(msg)
-	}
-	return ps, nil
-}
-
 func (ps *PlayerState) handleNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, normalKeys.quit):
@@ -257,6 +183,8 @@ func (ps *PlayerState) handleNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		_ = ps.random()
 	case key.Matches(msg, normalKeys.search):
 		ps.enterSearch()
+	case key.Matches(msg, normalKeys.edit):
+		ps.enterEditMode()
 	}
 	return ps, nil
 }

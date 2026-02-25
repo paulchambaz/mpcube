@@ -22,6 +22,7 @@
         ];
         libPkgs = with pkgs; [
           libmpdclient
+          kid3-cli
         ];
         devPkgs = with pkgs; [
           just
