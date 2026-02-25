@@ -23,9 +23,9 @@ func (ps *PlayerState) renderEditView() string {
 	rightBottomHeight := (ps.windowHeight - 6) / 3
 	rightMiddleHeight := rightBottomHeight
 	rightTopHeight := ps.windowHeight - 6 - rightBottomHeight - rightMiddleHeight
-	rightTopPanel := ps.renderEditEmptyPanel(" Metadata ", sideWidth, rightTopHeight)
-	rightMiddlePanel := ps.renderEditEmptyPanel(" Cover ", sideWidth, rightMiddleHeight)
-	rightBottomPanel := ps.renderEditEmptyPanel(" Download ", sideWidth, rightBottomHeight)
+	rightTopPanel := ps.renderEditEmptyPanel(" Metadata ", sideWidth, rightTopHeight, ps.editFocus == EditFocusMetadata)
+	rightMiddlePanel := ps.renderEditEmptyPanel(" Cover ", sideWidth, rightMiddleHeight, ps.editFocus == EditFocusCover)
+	rightBottomPanel := ps.renderEditEmptyPanel(" Download ", sideWidth, rightBottomHeight, ps.editFocus == EditFocusDownload)
 	rightColumn := lipgloss.JoinVertical(0.0, rightTopPanel, rightMiddlePanel, rightBottomPanel)
 
 	centerPanel := ps.renderEditCenterPanel(centerWidth, centerHeight)
@@ -140,14 +140,22 @@ func (ps *PlayerState) renderEditTitlesPanel(width, height int) string {
 	return topStyle.Render(topBorder) + "\n" + contentStyle.Render(strings.Join(content, "\n"))
 }
 
-func (ps *PlayerState) renderEditEmptyPanel(title string, width, height int) string {
-	borderColor := lipgloss.Color("8")
+func (ps *PlayerState) renderEditEmptyPanel(title string, width, height int, focused bool) string {
+	var borderColor lipgloss.Color
+	if focused {
+		borderColor = lipgloss.Color("9")
+	} else {
+		borderColor = lipgloss.Color("8")
+	}
 
 	remainingWidth := width - len(title)
 	leftPad := remainingWidth / 2
 	rightPad := remainingWidth - leftPad
 	topBorder := "┌" + strings.Repeat("─", max(0, leftPad)) + title + strings.Repeat("─", max(0, rightPad)) + "┐"
 	topStyle := lipgloss.NewStyle().Foreground(borderColor)
+	if focused {
+		topStyle = topStyle.Bold(true)
+	}
 
 	contentStyle := lipgloss.NewStyle().
 		Width(width).
@@ -160,7 +168,7 @@ func (ps *PlayerState) renderEditEmptyPanel(title string, width, height int) str
 }
 
 func (ps *PlayerState) renderEditCenterPanel(width, height int) string {
-	focused := ps.editFocus == EditFocusCenter
+	focused := ps.editFocus == EditFocusCenter || ps.mode == ModeEditTerminal
 	var borderColor lipgloss.Color
 	if focused {
 		borderColor = lipgloss.Color("9")

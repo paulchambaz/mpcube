@@ -12,6 +12,9 @@ const (
 	EditFocusCenter EditFocus = iota
 	EditFocusAlbums
 	EditFocusTitles
+	EditFocusMetadata
+	EditFocusCover
+	EditFocusDownload
 )
 
 type editTrackState struct {
@@ -237,6 +240,48 @@ func (ps *PlayerState) editRevertAll() {
 	for i := range ps.editTracks {
 		ps.editTracks[i] = ps.editTracksOrig[i]
 	}
+}
+
+func (ps *PlayerState) editTileNav(msg string) bool {
+	switch msg {
+	case "H":
+		switch ps.editFocus {
+		case EditFocusCenter:
+			ps.editFocus = EditFocusAlbums
+		case EditFocusMetadata, EditFocusCover, EditFocusDownload:
+			ps.editFocus = EditFocusCenter
+		}
+		return true
+	case "L":
+		switch ps.editFocus {
+		case EditFocusAlbums, EditFocusTitles:
+			ps.editFocus = EditFocusCenter
+		case EditFocusCenter:
+			ps.editFocus = EditFocusMetadata
+		}
+		return true
+	case "J":
+		switch ps.editFocus {
+		case EditFocusAlbums:
+			ps.editFocus = EditFocusTitles
+		case EditFocusMetadata:
+			ps.editFocus = EditFocusCover
+		case EditFocusCover:
+			ps.editFocus = EditFocusDownload
+		}
+		return true
+	case "K":
+		switch ps.editFocus {
+		case EditFocusTitles:
+			ps.editFocus = EditFocusAlbums
+		case EditFocusDownload:
+			ps.editFocus = EditFocusCover
+		case EditFocusCover:
+			ps.editFocus = EditFocusMetadata
+		}
+		return true
+	}
+	return false
 }
 
 func (ps *PlayerState) editSyncFilenames() {

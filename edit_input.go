@@ -14,6 +14,7 @@ import (
 type editCenterKeyMap struct {
 	quit      key.Binding
 	left      key.Binding
+	right     key.Binding
 	up        key.Binding
 	down      key.Binding
 	top       key.Binding
@@ -69,38 +70,38 @@ func (k editCenterKeyMap) bindings() []helpEntry {
 }
 
 type editSideKeyMap struct {
-	right    key.Binding
-	enter    key.Binding
-	up       key.Binding
-	down     key.Binding
-	top      key.Binding
-	bottom   key.Binding
-	jumpNext key.Binding
-	search   key.Binding
+	right  key.Binding
+	enter  key.Binding
+	up     key.Binding
+	down   key.Binding
+	top    key.Binding
+	bottom key.Binding
+	search key.Binding
 }
 
 var editAlbumKeys = editSideKeyMap{
-	right:    key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l", "editor")),
-	enter:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "editor")),
-	up:       key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
-	down:     key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
-	top:      key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
-	bottom:   key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
-	jumpNext: key.NewBinding(key.WithKeys("J"), key.WithHelp("J", "titles")),
-	search:   key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+	right:  key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l", "editor")),
+	enter:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "editor")),
+	up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
+	down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
+	top:    key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
+	bottom: key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
+	search: key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 }
 
 var editTitleKeys = editSideKeyMap{
-	right:    key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l", "editor")),
-	enter:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "editor")),
-	up:       key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
-	down:     key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
-	top:      key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
-	bottom:   key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
-	jumpNext: key.NewBinding(key.WithKeys("K"), key.WithHelp("K", "albums")),
+	right:  key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l", "editor")),
+	enter:  key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "editor")),
+	up:     key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("k", "up")),
+	down:   key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("j", "down")),
+	top:    key.NewBinding(key.WithKeys("home", "g"), key.WithHelp("g", "top")),
+	bottom: key.NewBinding(key.WithKeys("end", "G"), key.WithHelp("G", "bottom")),
 }
 
 func (ps *PlayerState) handleEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if ps.editTileNav(msg.String()) {
+		return ps, nil
+	}
 	switch ps.editFocus {
 	case EditFocusCenter:
 		return ps.handleEditCenter(msg)
@@ -108,6 +109,8 @@ func (ps *PlayerState) handleEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps.handleEditAlbums(msg)
 	case EditFocusTitles:
 		return ps.handleEditTitles(msg)
+	case EditFocusMetadata, EditFocusCover, EditFocusDownload:
+		return ps.handleEditRight(msg)
 	}
 	return ps, nil
 }
@@ -121,6 +124,12 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			ps.editFocus = EditFocusAlbums
 		} else {
 			ps.editFocus = EditFocusTitles
+		}
+	case key.Matches(msg, editCenterKeys.right):
+		if ps.editFieldIdx == 4 {
+			ps.editFocus = EditFocusCover
+		} else {
+			ps.editFocus = EditFocusMetadata
 		}
 	case key.Matches(msg, editCenterKeys.up):
 		ps.editCenterMoveUp()
@@ -171,11 +180,7 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			ps.albumSelected++
 			ps.editAlbumFixOffset()
 			ps.editLoadAlbum()
-		} else {
-			ps.editFocus = EditFocusTitles
 		}
-	case key.Matches(msg, editAlbumKeys.jumpNext):
-		ps.editFocus = EditFocusTitles
 	case key.Matches(msg, editAlbumKeys.top):
 		ps.albumSelected = 0
 		ps.albumOffset = 0
@@ -205,11 +210,7 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if ps.editTitleIdx > 0 {
 			ps.editTitleIdx--
 			ps.editFixTitleOffset()
-		} else {
-			ps.editFocus = EditFocusAlbums
 		}
-	case key.Matches(msg, editTitleKeys.jumpNext):
-		ps.editFocus = EditFocusAlbums
 	case key.Matches(msg, editTitleKeys.down):
 		if ps.editTitleIdx < len(ps.editTracks)-1 {
 			ps.editTitleIdx++
@@ -221,6 +222,18 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, editTitleKeys.bottom):
 		ps.editTitleIdx = len(ps.editTracks) - 1
 		ps.editFixTitleOffset()
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleEditRight(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, editCenterKeys.quit):
+		ps.exitEditMode()
+	case key.Matches(msg, editCenterKeys.left):
+		ps.editFocus = EditFocusCenter
+	case key.Matches(msg, editCenterKeys.search):
+		ps.editEnterSearch()
 	}
 	return ps, nil
 }
