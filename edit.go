@@ -62,6 +62,8 @@ func (ps *PlayerState) enterEditMode() {
 	}
 
 	ps.editFocus = EditFocusCenter
+	ps.editLastLeft = EditFocusAlbums
+	ps.editLastRight = EditFocusMetadata
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
 	ps.editTitleIdx = 0
@@ -247,17 +249,19 @@ func (ps *PlayerState) editTileNav(msg string) bool {
 	case "H":
 		switch ps.editFocus {
 		case EditFocusCenter:
-			ps.editFocus = EditFocusAlbums
+			ps.editFocus = ps.editLastLeft
 		case EditFocusMetadata, EditFocusCover, EditFocusDownload:
+			ps.editLastRight = ps.editFocus
 			ps.editFocus = EditFocusCenter
 		}
 		return true
 	case "L":
 		switch ps.editFocus {
 		case EditFocusAlbums, EditFocusTitles:
+			ps.editLastLeft = ps.editFocus
 			ps.editFocus = EditFocusCenter
 		case EditFocusCenter:
-			ps.editFocus = EditFocusMetadata
+			ps.editFocus = ps.editLastRight
 		}
 		return true
 	case "J":

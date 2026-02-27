@@ -56,6 +56,8 @@ type PlayerState struct {
 	retryCount int
 
 	editFocus       EditFocus
+	editLastLeft    EditFocus
+	editLastRight   EditFocus
 	editFieldIdx    int
 	editFieldOffset int
 	editTitleIdx    int
