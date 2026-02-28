@@ -20,9 +20,9 @@ func (ps *PlayerState) renderEditView() string {
 	titlesPanel := ps.renderEditTitlesPanel(sideWidth, titlesPanelHeight)
 	leftColumn := lipgloss.JoinVertical(0.0, albumsPanel, titlesPanel)
 
-	rightBottomHeight := (ps.windowHeight - 6) / 3
-	rightMiddleHeight := rightBottomHeight
-	rightTopHeight := ps.windowHeight - 6 - rightBottomHeight - rightMiddleHeight
+	rightTopHeight := (ps.windowHeight - 6) / 3
+	rightMiddleHeight := rightTopHeight
+	rightBottomHeight := ps.windowHeight - 6 - rightTopHeight - rightMiddleHeight
 	rightTopPanel := ps.renderEditEmptyPanel(" Metadata ", sideWidth, rightTopHeight, ps.editFocus == EditFocusMetadata)
 	rightMiddlePanel := ps.renderEditEmptyPanel(" Cover ", sideWidth, rightMiddleHeight, ps.editFocus == EditFocusCover)
 	rightBottomPanel := ps.renderEditEmptyPanel(" Download ", sideWidth, rightBottomHeight, ps.editFocus == EditFocusDownload)
