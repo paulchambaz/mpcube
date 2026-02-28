@@ -24,7 +24,7 @@ func (ps *PlayerState) renderEditView() string {
 	rightMiddleHeight := rightTopHeight
 	rightBottomHeight := ps.windowHeight - 6 - rightTopHeight - rightMiddleHeight
 	rightTopPanel := ps.renderEditEmptyPanel(" Metadata ", sideWidth, rightTopHeight, ps.editFocus == EditFocusMetadata)
-	rightMiddlePanel := ps.renderEditEmptyPanel(" Cover ", sideWidth, rightMiddleHeight, ps.editFocus == EditFocusCover)
+	rightMiddlePanel := ps.renderEditCoverPanel(sideWidth, rightMiddleHeight)
 	rightBottomPanel := ps.renderEditEmptyPanel(" Download ", sideWidth, rightBottomHeight, ps.editFocus == EditFocusDownload)
 	rightColumn := lipgloss.JoinVertical(0.0, rightTopPanel, rightMiddlePanel, rightBottomPanel)
 
@@ -155,6 +155,44 @@ func (ps *PlayerState) renderEditTitlesPanel(width, height int) string {
 	return topStyle.Render(topBorder) + "\n" + contentStyle.Render(strings.Join(content, "\n"))
 }
 
+func (ps *PlayerState) renderEditCoverPanel(width, height int) string {
+	focused := ps.editFocus == EditFocusCover
+	var borderColor lipgloss.Color
+	if focused {
+		borderColor = lipgloss.Color("9")
+	} else {
+		borderColor = lipgloss.Color("8")
+	}
+
+	title := " Cover "
+	remainingWidth := width - len(title)
+	leftPad := remainingWidth / 2
+	rightPad := remainingWidth - leftPad
+	topBorder := "┌" + strings.Repeat("─", max(0, leftPad)) + title + strings.Repeat("─", max(0, rightPad)) + "┐"
+	topStyle := lipgloss.NewStyle().Foreground(borderColor)
+	if focused {
+		topStyle = topStyle.Bold(true)
+	}
+
+	contentStyle := lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Border(lipgloss.NormalBorder()).
+		BorderTop(false).
+		BorderForeground(borderColor)
+
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+
+	search := ps.editCoverSearch
+	maxSearch := width - len(" Search: ") - 1
+	if len(search) > maxSearch {
+		search = search[:maxSearch]
+	}
+	content := dimStyle.Render(" Search: " + search)
+
+	return topStyle.Render(topBorder) + "\n" + contentStyle.Render(content)
+}
+
 func (ps *PlayerState) renderEditEmptyPanel(title string, width, height int, focused bool) string {
 	var borderColor lipgloss.Color
 	if focused {
@@ -260,6 +298,14 @@ func (ps *PlayerState) renderEditCenterPanel(width, height int) string {
 		if rl.fieldIdx < editAlbumFieldCount {
 			label = albumLabels[rl.fieldIdx]
 			value = ps.editAlbum[rl.fieldIdx]
+			if rl.fieldIdx == 4 {
+				if !ps.editHasCoverFile {
+					value = "[missing]"
+				}
+				if ps.editHasEmbeddedArt {
+					value += " [emb]"
+				}
+			}
 		} else {
 			ti := ps.editTrackIdx(rl.fieldIdx)
 			fi := ps.editTrackFieldIdx(rl.fieldIdx)
@@ -278,7 +324,6 @@ func (ps *PlayerState) renderEditCenterPanel(width, height int) string {
 		if ps.editIsModified(rl.fieldIdx) {
 			mod = " [mod]"
 		}
-
 		valWidth := max(0, width-maxLabel-3-len(mod))
 		var line string
 		if editInput {

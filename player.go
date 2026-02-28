@@ -67,9 +67,14 @@ type PlayerState struct {
 	editAlbumOrig   [5]string
 	editTracks      []editTrackState
 	editTracksOrig  []editTrackState
-	editCorrupted   []bool
-	editInputBuf    string
-	editInputPos    int
+	editCorrupted      []bool
+	editHasCoverFile   bool
+	editCoverFile      string
+	editHasEmbeddedArt   bool
+	editStripEmbeddedArt bool
+	editCoverSearch      string
+	editInputBuf       string
+	editInputPos       int
 
 	applyQueue       []applyCmd
 	applyProgress    int

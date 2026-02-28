@@ -36,6 +36,14 @@ func kid3WriteTags(path string, tags map[string]string) error {
 	return nil
 }
 
+func kid3StripPicture(path string) error {
+	cmd := exec.Command("kid3-cli", "-c", "remove Picture", path)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("kid3-cli failed for %s: %w: %s", path, err, out)
+	}
+	return nil
+}
+
 func kid3WriteTagsBatch(dir string, tags map[string]string) error {
 	var args []string
 	for key, val := range tags {
