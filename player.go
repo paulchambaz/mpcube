@@ -67,6 +67,7 @@ type PlayerState struct {
 	editAlbumOrig   [5]string
 	editTracks      []editTrackState
 	editTracksOrig  []editTrackState
+	editCorrupted   []bool
 	editInputBuf    string
 	editInputPos    int
 

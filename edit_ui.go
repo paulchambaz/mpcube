@@ -130,11 +130,26 @@ func (ps *PlayerState) renderEditTitlesPanel(width, height int) string {
 			style = style.Foreground(lipgloss.Color("8"))
 		}
 		track := ps.editTracksOrig[i]
-		line := fmt.Sprintf(" %2s - %s", track.Track, track.Title)
+		cor := ""
+		if i < len(ps.editCorrupted) && ps.editCorrupted[i] {
+			cor = "[cor] "
+		}
+		line := fmt.Sprintf(" %2s - %s%s", track.Track, cor, track.Title)
 		if len(line) > width {
 			line = line[:width]
 		}
-		content = append(content, style.Render(fmt.Sprintf("%-*s", width, line)))
+		if cor != "" && !isSelected {
+			corStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+			prefix := fmt.Sprintf(" %2s - ", track.Track)
+			rest := fmt.Sprintf("%s", track.Title)
+			if len(prefix)+len(cor)+len(rest) > width {
+				rest = rest[:max(0, width-len(prefix)-len(cor))]
+			}
+			rendered := style.Render(prefix) + corStyle.Render(cor) + style.Render(fmt.Sprintf("%-*s", max(0, width-len(prefix)-len(cor)), rest))
+			content = append(content, rendered)
+		} else {
+			content = append(content, style.Render(fmt.Sprintf("%-*s", width, line)))
+		}
 	}
 
 	return topStyle.Render(topBorder) + "\n" + contentStyle.Render(strings.Join(content, "\n"))

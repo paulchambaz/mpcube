@@ -55,6 +55,7 @@ func (ps *PlayerState) enterEditMode() {
 
 	ps.editTracks = make([]editTrackState, len(album.Songs))
 	ps.editTracksOrig = make([]editTrackState, len(album.Songs))
+	ps.editCorrupted = make([]bool, len(album.Songs))
 	for i, song := range album.Songs {
 		t := editTrackState{
 			Track: strconv.Itoa(song.Track),
@@ -63,6 +64,7 @@ func (ps *PlayerState) enterEditMode() {
 		}
 		ps.editTracks[i] = t
 		ps.editTracksOrig[i] = t
+		ps.editCorrupted[i] = checkFile(filepath.Join(ps.config.MusicDir, song.URI)) != nil
 	}
 
 	ps.editFocus = EditFocusCenter
@@ -84,6 +86,7 @@ func (ps *PlayerState) exitEditMode() tea.Cmd {
 	ps.editAlbumOrig = [5]string{}
 	ps.editTracks = nil
 	ps.editTracksOrig = nil
+	ps.editCorrupted = nil
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
 	ps.editTitleIdx = 0
@@ -214,6 +217,7 @@ func (ps *PlayerState) editLoadAlbum() {
 
 	ps.editTracks = make([]editTrackState, len(album.Songs))
 	ps.editTracksOrig = make([]editTrackState, len(album.Songs))
+	ps.editCorrupted = make([]bool, len(album.Songs))
 	for i, song := range album.Songs {
 		t := editTrackState{
 			Track: strconv.Itoa(song.Track),
@@ -222,6 +226,7 @@ func (ps *PlayerState) editLoadAlbum() {
 		}
 		ps.editTracks[i] = t
 		ps.editTracksOrig[i] = t
+		ps.editCorrupted[i] = checkFile(filepath.Join(ps.config.MusicDir, song.URI)) != nil
 	}
 
 	ps.editFieldIdx = 0
