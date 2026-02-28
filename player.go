@@ -20,6 +20,7 @@ const (
 	ModeEditInput
 	ModeEditSearch
 	ModeEditSearching
+	ModeEditApply
 )
 
 type PlayerState struct {
@@ -68,6 +69,11 @@ type PlayerState struct {
 	editTracksOrig  []editTrackState
 	editInputBuf    string
 	editInputPos    int
+
+	applyQueue       []applyCmd
+	applyProgress    int
+	applyError       string
+	applyReturnFocus EditFocus
 }
 
 func NewPlayerState(config Config, musicData *MusicData, mpdClient *mpd.Client) (*PlayerState, error) {
@@ -147,6 +153,16 @@ func (ps *PlayerState) tickCmd() tea.Cmd {
 
 type tickMsg struct{}
 
+type applyStepMsg struct {
+	err error
+}
+
+type applyFinishMsg struct{}
+
+type libraryReloadMsg struct {
+	musicData *MusicData
+}
+
 func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -166,6 +182,20 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editorFinishedMsg:
 		ps.handleEditorFinished(msg)
+		return ps, nil
+
+	case applyStepMsg:
+		return ps.handleApplyStep(msg)
+
+	case applyFinishMsg:
+		return ps.handleApplyFinish(msg)
+
+	case libraryReloadMsg:
+		if msg.musicData != nil {
+			ps.musicData = msg.musicData
+			ps.updateMPDState()
+			ps.resize()
+		}
 		return ps, nil
 
 	case tea.KeyMsg:

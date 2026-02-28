@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type EditFocus int
@@ -75,7 +79,7 @@ func (ps *PlayerState) enterEditMode() {
 	ps.editFixTitleOffset()
 }
 
-func (ps *PlayerState) exitEditMode() {
+func (ps *PlayerState) exitEditMode() tea.Cmd {
 	ps.editAlbum = [5]string{}
 	ps.editAlbumOrig = [5]string{}
 	ps.editTracks = nil
@@ -87,6 +91,12 @@ func (ps *PlayerState) exitEditMode() {
 	ps.editInputBuf = ""
 	ps.editInputPos = 0
 	ps.mode = ModeNormal
+	client := ps.mpdClient
+	return func() tea.Msg {
+		client.Update("")
+		musicData, _ := LoadMusicData(client)
+		return libraryReloadMsg{musicData: musicData}
+	}
 }
 
 func (ps *PlayerState) editFieldCount() int {
@@ -288,8 +298,12 @@ func (ps *PlayerState) editTileNav(msg string) bool {
 	return false
 }
 
+func sanitizeFilename(s string) string {
+	return strings.ReplaceAll(s, "/", "-")
+}
+
 func (ps *PlayerState) editSyncFilenames() {
-	ps.editAlbum[3] = ps.editAlbum[1] + " - " + ps.editAlbum[0]
+	ps.editAlbum[3] = sanitizeFilename(ps.editAlbum[1] + " - " + ps.editAlbum[0])
 
 	for i := range ps.editTracks {
 		ext := filepath.Ext(ps.editTracksOrig[i].File)
@@ -297,6 +311,223 @@ func (ps *PlayerState) editSyncFilenames() {
 		if err != nil {
 			track = i + 1
 		}
-		ps.editTracks[i].File = fmt.Sprintf("%02d - %s%s", track, ps.editTracks[i].Title, ext)
+		ps.editTracks[i].File = fmt.Sprintf("%02d - %s%s", track, sanitizeFilename(ps.editTracks[i].Title), ext)
 	}
+}
+
+// Apply pipeline
+
+type applyOp int
+
+const (
+	applyOpTagWrite applyOp = iota
+	applyOpRename
+)
+
+type applyCmd struct {
+	fieldIdx int
+	op       applyOp
+	srcPath  string
+	dstPath  string
+	tags     map[string]string
+}
+
+var albumTagNames = [3]string{"Album", "Artist", "Date"}
+var trackTagNames = [2]string{"Track Number", "Title"}
+
+func (ps *PlayerState) editBuildApplyField(fieldIdx int) []applyCmd {
+	baseDir := ps.config.MusicDir
+	currentDir := ps.editAlbumOrig[3]
+	var cmds []applyCmd
+
+	if fieldIdx < 3 {
+		for _, track := range ps.editTracksOrig {
+			cmds = append(cmds, applyCmd{
+				fieldIdx: fieldIdx,
+				op:       applyOpTagWrite,
+				srcPath:  filepath.Join(baseDir, currentDir, track.File),
+				tags:     map[string]string{albumTagNames[fieldIdx]: ps.editAlbum[fieldIdx]},
+			})
+		}
+	} else if fieldIdx == 3 {
+		cmds = append(cmds, applyCmd{
+			fieldIdx: fieldIdx,
+			op:       applyOpRename,
+			srcPath:  filepath.Join(baseDir, currentDir),
+			dstPath:  filepath.Join(baseDir, ps.editAlbum[3]),
+		})
+	} else if fieldIdx >= editAlbumFieldCount {
+		ti := ps.editTrackIdx(fieldIdx)
+		fi := ps.editTrackFieldIdx(fieldIdx)
+		if fi < 2 {
+			cmds = append(cmds, applyCmd{
+				fieldIdx: fieldIdx,
+				op:       applyOpTagWrite,
+				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
+				tags:     map[string]string{trackTagNames[fi]: ps.editTrackValue(ti, fi)},
+			})
+		} else {
+			cmds = append(cmds, applyCmd{
+				fieldIdx: fieldIdx,
+				op:       applyOpRename,
+				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
+				dstPath:  filepath.Join(baseDir, currentDir, ps.editTracks[ti].File),
+			})
+		}
+	}
+
+	return cmds
+}
+
+func (ps *PlayerState) editBuildApplyAll() []applyCmd {
+	baseDir := ps.config.MusicDir
+	currentDir := ps.editAlbumOrig[3]
+	var cmds []applyCmd
+
+	for idx := 0; idx < 3; idx++ {
+		if !ps.editIsModified(idx) {
+			continue
+		}
+		for _, track := range ps.editTracksOrig {
+			cmds = append(cmds, applyCmd{
+				fieldIdx: idx,
+				op:       applyOpTagWrite,
+				srcPath:  filepath.Join(baseDir, currentDir, track.File),
+				tags:     map[string]string{albumTagNames[idx]: ps.editAlbum[idx]},
+			})
+		}
+	}
+
+	if ps.editIsModified(3) {
+		cmds = append(cmds, applyCmd{
+			fieldIdx: 3,
+			op:       applyOpRename,
+			srcPath:  filepath.Join(baseDir, currentDir),
+			dstPath:  filepath.Join(baseDir, ps.editAlbum[3]),
+		})
+		currentDir = ps.editAlbum[3]
+	}
+
+	for ti := 0; ti < len(ps.editTracks); ti++ {
+		baseIdx := editAlbumFieldCount + ti*3
+		for fi := 0; fi < 2; fi++ {
+			if !ps.editIsModified(baseIdx + fi) {
+				continue
+			}
+			cmds = append(cmds, applyCmd{
+				fieldIdx: baseIdx + fi,
+				op:       applyOpTagWrite,
+				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
+				tags:     map[string]string{trackTagNames[fi]: ps.editTrackValue(ti, fi)},
+			})
+		}
+		if ps.editIsModified(baseIdx + 2) {
+			cmds = append(cmds, applyCmd{
+				fieldIdx: baseIdx + 2,
+				op:       applyOpRename,
+				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
+				dstPath:  filepath.Join(baseDir, currentDir, ps.editTracks[ti].File),
+			})
+		}
+	}
+
+	return cmds
+}
+
+func (ps *PlayerState) editTrackValue(ti, fi int) string {
+	switch fi {
+	case 0:
+		return ps.editTracks[ti].Track
+	case 1:
+		return ps.editTracks[ti].Title
+	}
+	return ""
+}
+
+func (ps *PlayerState) editStartApply(cmds []applyCmd) tea.Cmd {
+	if len(cmds) == 0 {
+		return nil
+	}
+	ps.applyQueue = cmds
+	ps.applyProgress = 0
+	ps.applyError = ""
+	ps.applyReturnFocus = ps.editFocus
+	ps.editFocus = EditFocusCenter
+	ps.editFieldIdx = cmds[0].fieldIdx
+	ps.editFixCenterOffset()
+	ps.mode = ModeEditApply
+	return ps.applyNextStep()
+}
+
+func (ps *PlayerState) applyNextStep() tea.Cmd {
+	cmd := ps.applyQueue[ps.applyProgress]
+	return func() tea.Msg {
+		var err error
+		switch cmd.op {
+		case applyOpTagWrite:
+			err = kid3WriteTags(cmd.srcPath, cmd.tags)
+		case applyOpRename:
+			err = os.Rename(cmd.srcPath, cmd.dstPath)
+		}
+		return applyStepMsg{err: err}
+	}
+}
+
+func (ps *PlayerState) handleApplyStep(msg applyStepMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		ps.applyError = msg.err.Error()
+		ps.applyQueue = nil
+		ps.mode = ModeEdit
+		return ps, nil
+	}
+
+	completedFieldIdx := ps.applyQueue[ps.applyProgress].fieldIdx
+	ps.applyProgress++
+
+	nextIsNewField := ps.applyProgress >= len(ps.applyQueue) ||
+		ps.applyQueue[ps.applyProgress].fieldIdx != completedFieldIdx
+
+	if nextIsNewField {
+		ps.editApplyUpdateOrig(completedFieldIdx)
+	}
+
+	if ps.applyProgress < len(ps.applyQueue) {
+		ps.editFieldIdx = ps.applyQueue[ps.applyProgress].fieldIdx
+		ps.editFixCenterOffset()
+		return ps, ps.applyNextStep()
+	}
+
+	return ps, ps.applyFinishCmd()
+}
+
+func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
+	if fieldIdx < editAlbumFieldCount {
+		ps.editAlbumOrig[fieldIdx] = ps.editAlbum[fieldIdx]
+		return
+	}
+	ti := ps.editTrackIdx(fieldIdx)
+	fi := ps.editTrackFieldIdx(fieldIdx)
+	switch fi {
+	case 0:
+		ps.editTracksOrig[ti].Track = ps.editTracks[ti].Track
+	case 1:
+		ps.editTracksOrig[ti].Title = ps.editTracks[ti].Title
+	case 2:
+		ps.editTracksOrig[ti].File = ps.editTracks[ti].File
+	}
+}
+
+func (ps *PlayerState) applyFinishCmd() tea.Cmd {
+	client := ps.mpdClient
+	return func() tea.Msg {
+		client.Update("")
+		return applyFinishMsg{}
+	}
+}
+
+func (ps *PlayerState) handleApplyFinish(_ applyFinishMsg) (tea.Model, tea.Cmd) {
+	ps.applyQueue = nil
+	ps.editFocus = ps.applyReturnFocus
+	ps.mode = ModeEdit
+	return ps, nil
 }

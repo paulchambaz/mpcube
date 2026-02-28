@@ -24,6 +24,8 @@ type editCenterKeyMap struct {
 	sync      key.Binding
 	revert    key.Binding
 	revertAll key.Binding
+	apply     key.Binding
+	applyAll  key.Binding
 	playPause key.Binding
 	search    key.Binding
 	openCover key.Binding
@@ -42,6 +44,8 @@ var editCenterKeys = editCenterKeyMap{
 	sync:      key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sync filenames")),
 	revert:    key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "revert")),
 	revertAll: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "revert all")),
+	apply:     key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "apply field")),
+	applyAll:  key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "apply all")),
 	playPause: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
 	search:    key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 	openCover: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open cover")),
@@ -60,6 +64,8 @@ func (k editCenterKeyMap) bindings() []helpEntry {
 		bindingHelp(k.sync),
 		bindingHelp(k.revert),
 		bindingHelp(k.revertAll),
+		bindingHelp(k.apply),
+		bindingHelp(k.applyAll),
 		bindingHelp(k.openCover),
 		bindingHelp(k.playPause),
 		bindingHelp(globalKeys.seekForward),
@@ -100,6 +106,10 @@ var editTitleKeys = editSideKeyMap{
 }
 
 func (ps *PlayerState) handleEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if ps.applyError != "" {
+		ps.applyError = ""
+		return ps, nil
+	}
 	if ps.editTileNav(msg.String()) {
 		return ps, nil
 	}
@@ -119,7 +129,7 @@ func (ps *PlayerState) handleEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, editCenterKeys.quit):
-		ps.exitEditMode()
+		return ps, ps.exitEditMode()
 	case key.Matches(msg, editCenterKeys.left):
 		if ps.editIsAlbumField(ps.editFieldIdx) {
 			ps.editFocus = EditFocusAlbums
@@ -154,6 +164,15 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editRevertField()
 	case key.Matches(msg, editCenterKeys.revertAll):
 		ps.editRevertAll()
+	case key.Matches(msg, editCenterKeys.apply):
+		if ps.editIsModified(ps.editFieldIdx) {
+			return ps, ps.editStartApply(ps.editBuildApplyField(ps.editFieldIdx))
+		}
+	case key.Matches(msg, editCenterKeys.applyAll):
+		cmds := ps.editBuildApplyAll()
+		if len(cmds) > 0 {
+			return ps, ps.editStartApply(cmds)
+		}
 	case key.Matches(msg, editCenterKeys.playPause):
 		_ = ps.togglePlayPause()
 	case key.Matches(msg, editCenterKeys.search):
@@ -167,7 +186,7 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, editCenterKeys.quit):
-		ps.exitEditMode()
+		return ps, ps.exitEditMode()
 	case key.Matches(msg, editAlbumKeys.right), key.Matches(msg, editAlbumKeys.enter):
 		ps.editFocus = EditFocusCenter
 	case key.Matches(msg, editAlbumKeys.up):
@@ -192,6 +211,15 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editLoadAlbum()
 	case key.Matches(msg, editAlbumKeys.search):
 		ps.editEnterSearch()
+	case key.Matches(msg, editCenterKeys.sync):
+		ps.editSyncFilenames()
+	case key.Matches(msg, editCenterKeys.applyAll):
+		cmds := ps.editBuildApplyAll()
+		if len(cmds) > 0 {
+			return ps, ps.editStartApply(cmds)
+		}
+	case key.Matches(msg, editCenterKeys.editor):
+		return ps, ps.editOpenEditor()
 	}
 	return ps, nil
 }
@@ -199,7 +227,7 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, editCenterKeys.quit):
-		ps.exitEditMode()
+		return ps, ps.exitEditMode()
 	case key.Matches(msg, editTitleKeys.right), key.Matches(msg, editTitleKeys.enter):
 		ps.editFieldIdx = editAlbumFieldCount + ps.editTitleIdx*3
 		if ps.editFieldIdx >= ps.editFieldCount() {
@@ -223,6 +251,15 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, editTitleKeys.bottom):
 		ps.editTitleIdx = len(ps.editTracks) - 1
 		ps.editFixTitleOffset()
+	case key.Matches(msg, editCenterKeys.sync):
+		ps.editSyncFilenames()
+	case key.Matches(msg, editCenterKeys.applyAll):
+		cmds := ps.editBuildApplyAll()
+		if len(cmds) > 0 {
+			return ps, ps.editStartApply(cmds)
+		}
+	case key.Matches(msg, editCenterKeys.editor):
+		return ps, ps.editOpenEditor()
 	}
 	return ps, nil
 }
@@ -230,7 +267,7 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (ps *PlayerState) handleEditRight(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, editCenterKeys.quit):
-		ps.exitEditMode()
+		return ps, ps.exitEditMode()
 	case key.Matches(msg, editCenterKeys.left):
 		ps.editFocus = EditFocusCenter
 	case key.Matches(msg, editCenterKeys.search):
@@ -286,7 +323,7 @@ func (ps *PlayerState) handleEditSearching(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case key.Matches(msg, editSearchingKeys.reSearch):
 		ps.mode = ModeEditSearch
 	case key.Matches(msg, editSearchingKeys.quit):
-		ps.exitEditMode()
+		return ps, ps.exitEditMode()
 	}
 	return ps, nil
 }
