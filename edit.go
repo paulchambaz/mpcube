@@ -459,6 +459,31 @@ func (ps *PlayerState) editStartApply(cmds []applyCmd) tea.Cmd {
 	return ps.applyNextStep()
 }
 
+func renameOrMerge(src, dst string) error {
+	err := os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+	srcInfo, statErr := os.Stat(src)
+	if statErr != nil || !srcInfo.IsDir() {
+		return err
+	}
+	dstInfo, statErr := os.Stat(dst)
+	if statErr != nil || !dstInfo.IsDir() {
+		return err
+	}
+	entries, readErr := os.ReadDir(src)
+	if readErr != nil {
+		return readErr
+	}
+	for _, e := range entries {
+		if err := os.Rename(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())); err != nil {
+			return err
+		}
+	}
+	return os.Remove(src)
+}
+
 func (ps *PlayerState) applyNextStep() tea.Cmd {
 	cmd := ps.applyQueue[ps.applyProgress]
 	return func() tea.Msg {
@@ -467,7 +492,7 @@ func (ps *PlayerState) applyNextStep() tea.Cmd {
 		case applyOpTagWrite:
 			err = kid3WriteTags(cmd.srcPath, cmd.tags)
 		case applyOpRename:
-			err = os.Rename(cmd.srcPath, cmd.dstPath)
+			err = renameOrMerge(cmd.srcPath, cmd.dstPath)
 		}
 		return applyStepMsg{err: err}
 	}
