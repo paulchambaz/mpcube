@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -22,9 +23,12 @@ const (
 )
 
 type editTrackState struct {
-	Track string
-	Title string
-	File  string
+	Track  string
+	Title  string
+	File   string
+	Dir    string
+	Album  string
+	Artist string
 }
 
 const editAlbumFieldCount = 5
@@ -72,10 +76,15 @@ func (ps *PlayerState) enterEditMode() {
 	ps.editTracksOrig = make([]editTrackState, len(album.Songs))
 	ps.editCorrupted = make([]bool, len(album.Songs))
 	for i, song := range album.Songs {
+		songDir := filepath.Dir(song.URI)
+		if songDir == "." {
+			songDir = ""
+		}
 		t := editTrackState{
 			Track: strconv.Itoa(song.Track),
 			Title: song.Title,
 			File:  filepath.Base(song.URI),
+			Dir:   songDir,
 		}
 		ps.editTracks[i] = t
 		ps.editTracksOrig[i] = t
@@ -87,7 +96,7 @@ func (ps *PlayerState) enterEditMode() {
 	} else {
 		ps.editHasEmbeddedArt = false
 	}
-	ps.editCoverSearch = ps.editAlbum[1] + " - " + ps.editAlbum[0]
+	ps.editCoverSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
 
 	ps.editFocus = EditFocusCenter
 	ps.editLastLeft = EditFocusAlbums
@@ -114,6 +123,19 @@ func (ps *PlayerState) exitEditMode() tea.Cmd {
 	ps.editHasEmbeddedArt = false
 	ps.editStripEmbeddedArt = false
 	ps.editCoverSearch = ""
+	ps.editCoverResults = nil
+	ps.editCoverResultIdx = 0
+	ps.editCoverResultOffset = 0
+	ps.editCoverLoading = false
+	ps.editCoverError = ""
+	ps.editCoverPending = false
+	ps.editCoverDownloading = false
+	ps.editCoverOpenAfterDownload = false
+	if ps.editCoverPreviewPath != "" {
+		os.Remove(ps.editCoverPreviewPath)
+		ps.editCoverPreviewPath = ""
+		ps.editCoverPreviewMBID = ""
+	}
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
 	ps.editTitleIdx = 0
@@ -204,10 +226,27 @@ func (ps *PlayerState) editSetValue(val string) {
 
 func (ps *PlayerState) editIsModified(idx int) bool {
 	if idx < editAlbumFieldCount {
-		if idx == 4 && ps.editStripEmbeddedArt {
+		if idx == 4 && (ps.editStripEmbeddedArt || ps.editCoverPending) {
 			return true
 		}
-		return ps.editAlbum[idx] != ps.editAlbumOrig[idx]
+		if ps.editAlbum[idx] != ps.editAlbumOrig[idx] {
+			return true
+		}
+		if idx == 0 {
+			for _, t := range ps.editTracks {
+				if t.Album != "" {
+					return true
+				}
+			}
+		}
+		if idx == 1 {
+			for _, t := range ps.editTracks {
+				if t.Artist != "" {
+					return true
+				}
+			}
+		}
+		return false
 	}
 	ti := (idx - editAlbumFieldCount) / 3
 	fi := (idx - editAlbumFieldCount) % 3
@@ -264,10 +303,15 @@ func (ps *PlayerState) editLoadAlbum() {
 	ps.editTracksOrig = make([]editTrackState, len(album.Songs))
 	ps.editCorrupted = make([]bool, len(album.Songs))
 	for i, song := range album.Songs {
+		songDir := filepath.Dir(song.URI)
+		if songDir == "." {
+			songDir = ""
+		}
 		t := editTrackState{
 			Track: strconv.Itoa(song.Track),
 			Title: song.Title,
 			File:  filepath.Base(song.URI),
+			Dir:   songDir,
 		}
 		ps.editTracks[i] = t
 		ps.editTracksOrig[i] = t
@@ -280,7 +324,11 @@ func (ps *PlayerState) editLoadAlbum() {
 		ps.editHasEmbeddedArt = false
 	}
 	ps.editStripEmbeddedArt = false
-	ps.editCoverSearch = ps.editAlbum[1] + " - " + ps.editAlbum[0]
+	ps.editCoverPending = false
+	ps.editCoverSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
+	ps.editCoverResults = nil
+	ps.editCoverResultIdx = 0
+	ps.editCoverResultOffset = 0
 
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
@@ -292,8 +340,19 @@ func (ps *PlayerState) editRevertField() {
 	idx := ps.editFieldIdx
 	if idx < editAlbumFieldCount {
 		ps.editAlbum[idx] = ps.editAlbumOrig[idx]
+		if idx == 0 {
+			for i := range ps.editTracks {
+				ps.editTracks[i].Album = ""
+			}
+		}
+		if idx == 1 {
+			for i := range ps.editTracks {
+				ps.editTracks[i].Artist = ""
+			}
+		}
 		if idx == 4 {
 			ps.editStripEmbeddedArt = false
+			ps.editCoverPending = false
 		}
 		return
 	}
@@ -311,6 +370,7 @@ func (ps *PlayerState) editRevertField() {
 func (ps *PlayerState) editRevertAll() {
 	ps.editAlbum = ps.editAlbumOrig
 	ps.editStripEmbeddedArt = false
+	ps.editCoverPending = false
 	for i := range ps.editTracks {
 		ps.editTracks[i] = ps.editTracksOrig[i]
 	}
@@ -344,6 +404,8 @@ func (ps *PlayerState) editTileNav(msg string) bool {
 			ps.editFocus = EditFocusCover
 		case EditFocusCover:
 			ps.editFocus = EditFocusDownload
+		default:
+			return false
 		}
 		return true
 	case "K":
@@ -354,6 +416,8 @@ func (ps *PlayerState) editTileNav(msg string) bool {
 			ps.editFocus = EditFocusCover
 		case EditFocusCover:
 			ps.editFocus = EditFocusMetadata
+		default:
+			return false
 		}
 		return true
 	}
@@ -376,8 +440,76 @@ func (ps *PlayerState) editSyncFilenames() {
 		ps.editTracks[i].File = fmt.Sprintf("%02d - %s%s", track, sanitizeFilename(ps.editTracks[i].Title), ext)
 	}
 
+	if ps.editHasCoverFile {
+		ext := filepath.Ext(ps.editAlbumOrig[4])
+		ps.editAlbum[4] = "cover" + ext
+	}
+
 	if ps.editHasEmbeddedArt {
 		ps.editStripEmbeddedArt = true
+	}
+}
+
+var trackFilenameRe = regexp.MustCompile(`^(\d+)[\s.\-]+(.+)\.\w+$`)
+var dirYearRe = regexp.MustCompile(`\((\d{4})\)\s*$`)
+
+func parseDirName(dir string) (artist, album, date string) {
+	// Extract year if present: "Artist - Album (2024)"
+	if m := dirYearRe.FindStringSubmatch(dir); m != nil {
+		date = m[1]
+		dir = strings.TrimSpace(dir[:len(dir)-len(m[0])])
+	}
+	// Split on first " - " for Artist - Album
+	if idx := strings.Index(dir, " - "); idx >= 0 {
+		artist = dir[:idx]
+		album = dir[idx+3:]
+	} else {
+		album = dir
+	}
+	return
+}
+
+func (ps *PlayerState) editReverseSyncFilenames() {
+	// Check if songs come from multiple directories
+	dirs := make(map[string]bool)
+	album := ps.musicData.Albums[ps.albumSelected]
+	for _, song := range album.Songs {
+		dirs[filepath.Dir(song.URI)] = true
+	}
+	mixed := len(dirs) > 1
+
+	if mixed {
+		ps.editAlbum[0] = "mixed"
+		ps.editAlbum[1] = "mixed"
+		// Per-track: parse each track's own directory
+		for i := range ps.editTracks {
+			artist, albumName, _ := parseDirName(ps.editTracksOrig[i].Dir)
+			ps.editTracks[i].Artist = artist
+			ps.editTracks[i].Album = albumName
+		}
+	} else {
+		artist, albumName, date := parseDirName(ps.editAlbumOrig[3])
+		if artist != "" {
+			ps.editAlbum[1] = artist
+		}
+		ps.editAlbum[0] = albumName
+		if date != "" {
+			ps.editAlbum[2] = date
+		}
+	}
+
+	// Parse track filenames
+	for i := range ps.editTracks {
+		m := trackFilenameRe.FindStringSubmatch(ps.editTracksOrig[i].File)
+		if m == nil {
+			continue
+		}
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			ps.editTracks[i].Track = strconv.Itoa(n)
+		} else {
+			ps.editTracks[i].Track = m[1]
+		}
+		ps.editTracks[i].Title = m[2]
 	}
 }
 
@@ -503,9 +635,10 @@ func detectEmbeddedArt(trackPath string) bool {
 type applyOp int
 
 const (
-	applyOpTagWrite  applyOp = iota
+	applyOpTagWrite      applyOp = iota
 	applyOpRename
 	applyOpStripArt
+	applyOpCoverInstall
 )
 
 type applyCmd struct {
@@ -514,6 +647,19 @@ type applyCmd struct {
 	srcPath  string
 	dstPath  string
 	tags     map[string]string
+}
+
+func (ps *PlayerState) editAlbumTagValue(fieldIdx, trackIdx int) string {
+	if trackIdx < len(ps.editTracks) {
+		t := ps.editTracks[trackIdx]
+		if fieldIdx == 0 && t.Album != "" {
+			return t.Album
+		}
+		if fieldIdx == 1 && t.Artist != "" {
+			return t.Artist
+		}
+	}
+	return ps.editAlbum[fieldIdx]
 }
 
 var albumTagNames = [3]string{"Album", "Artist", "Date"}
@@ -525,12 +671,13 @@ func (ps *PlayerState) editBuildApplyField(fieldIdx int) []applyCmd {
 	var cmds []applyCmd
 
 	if fieldIdx < 3 {
-		for _, track := range ps.editTracksOrig {
+		for i, track := range ps.editTracksOrig {
+			val := ps.editAlbumTagValue(fieldIdx, i)
 			cmds = append(cmds, applyCmd{
 				fieldIdx: fieldIdx,
 				op:       applyOpTagWrite,
-				srcPath:  filepath.Join(baseDir, currentDir, track.File),
-				tags:     map[string]string{albumTagNames[fieldIdx]: ps.editAlbum[fieldIdx]},
+				srcPath:  filepath.Join(baseDir, track.Dir, track.File),
+				tags:     map[string]string{albumTagNames[fieldIdx]: val},
 			})
 		}
 	} else if fieldIdx == 3 {
@@ -540,30 +687,48 @@ func (ps *PlayerState) editBuildApplyField(fieldIdx int) []applyCmd {
 			srcPath:  filepath.Join(baseDir, currentDir),
 			dstPath:  filepath.Join(baseDir, ps.editAlbum[3]),
 		})
-	} else if fieldIdx == 4 && ps.editStripEmbeddedArt {
-		for _, track := range ps.editTracksOrig {
+	} else if fieldIdx == 4 {
+		if ps.editCoverPending {
 			cmds = append(cmds, applyCmd{
 				fieldIdx: 4,
-				op:       applyOpStripArt,
-				srcPath:  filepath.Join(baseDir, currentDir, track.File),
+				op:       applyOpCoverInstall,
+				srcPath:  ps.editCoverPreviewPath,
+				dstPath:  filepath.Join(baseDir, currentDir, ps.editAlbum[4]),
 			})
+		} else if ps.editAlbum[4] != ps.editAlbumOrig[4] && ps.editHasCoverFile {
+			cmds = append(cmds, applyCmd{
+				fieldIdx: 4,
+				op:       applyOpRename,
+				srcPath:  filepath.Join(baseDir, currentDir, ps.editAlbumOrig[4]),
+				dstPath:  filepath.Join(baseDir, currentDir, ps.editAlbum[4]),
+			})
+		}
+		if ps.editStripEmbeddedArt {
+			for _, track := range ps.editTracksOrig {
+				cmds = append(cmds, applyCmd{
+					fieldIdx: 4,
+					op:       applyOpStripArt,
+					srcPath:  filepath.Join(baseDir, track.Dir, track.File),
+				})
+			}
 		}
 	} else if fieldIdx >= editAlbumFieldCount {
 		ti := ps.editTrackIdx(fieldIdx)
 		fi := ps.editTrackFieldIdx(fieldIdx)
+		trackDir := ps.editTracksOrig[ti].Dir
 		if fi < 2 {
 			cmds = append(cmds, applyCmd{
 				fieldIdx: fieldIdx,
 				op:       applyOpTagWrite,
-				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
+				srcPath:  filepath.Join(baseDir, trackDir, ps.editTracksOrig[ti].File),
 				tags:     map[string]string{trackTagNames[fi]: ps.editTrackValue(ti, fi)},
 			})
 		} else {
 			cmds = append(cmds, applyCmd{
 				fieldIdx: fieldIdx,
 				op:       applyOpRename,
-				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
-				dstPath:  filepath.Join(baseDir, currentDir, ps.editTracks[ti].File),
+				srcPath:  filepath.Join(baseDir, trackDir, ps.editTracksOrig[ti].File),
+				dstPath:  filepath.Join(baseDir, trackDir, ps.editTracks[ti].File),
 			})
 		}
 	}
@@ -580,12 +745,13 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 		if !ps.editIsModified(idx) {
 			continue
 		}
-		for _, track := range ps.editTracksOrig {
+		for i, track := range ps.editTracksOrig {
+			val := ps.editAlbumTagValue(idx, i)
 			cmds = append(cmds, applyCmd{
 				fieldIdx: idx,
 				op:       applyOpTagWrite,
-				srcPath:  filepath.Join(baseDir, currentDir, track.File),
-				tags:     map[string]string{albumTagNames[idx]: ps.editAlbum[idx]},
+				srcPath:  filepath.Join(baseDir, track.Dir, track.File),
+				tags:     map[string]string{albumTagNames[idx]: val},
 			})
 		}
 	}
@@ -600,18 +766,35 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 		currentDir = ps.editAlbum[3]
 	}
 
+	if ps.editCoverPending {
+		cmds = append(cmds, applyCmd{
+			fieldIdx: 4,
+			op:       applyOpCoverInstall,
+			srcPath:  ps.editCoverPreviewPath,
+			dstPath:  filepath.Join(baseDir, currentDir, ps.editAlbum[4]),
+		})
+	} else if ps.editAlbum[4] != ps.editAlbumOrig[4] && ps.editHasCoverFile {
+		cmds = append(cmds, applyCmd{
+			fieldIdx: 4,
+			op:       applyOpRename,
+			srcPath:  filepath.Join(baseDir, currentDir, ps.editAlbumOrig[4]),
+			dstPath:  filepath.Join(baseDir, currentDir, ps.editAlbum[4]),
+		})
+	}
+
 	if ps.editStripEmbeddedArt {
 		for _, track := range ps.editTracksOrig {
 			cmds = append(cmds, applyCmd{
 				fieldIdx: 4,
 				op:       applyOpStripArt,
-				srcPath:  filepath.Join(baseDir, currentDir, track.File),
+				srcPath:  filepath.Join(baseDir, track.Dir, track.File),
 			})
 		}
 	}
 
 	for ti := 0; ti < len(ps.editTracks); ti++ {
 		baseIdx := editAlbumFieldCount + ti*3
+		trackDir := ps.editTracksOrig[ti].Dir
 		for fi := 0; fi < 2; fi++ {
 			if !ps.editIsModified(baseIdx + fi) {
 				continue
@@ -619,7 +802,7 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 			cmds = append(cmds, applyCmd{
 				fieldIdx: baseIdx + fi,
 				op:       applyOpTagWrite,
-				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
+				srcPath:  filepath.Join(baseDir, trackDir, ps.editTracksOrig[ti].File),
 				tags:     map[string]string{trackTagNames[fi]: ps.editTrackValue(ti, fi)},
 			})
 		}
@@ -627,8 +810,8 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 			cmds = append(cmds, applyCmd{
 				fieldIdx: baseIdx + 2,
 				op:       applyOpRename,
-				srcPath:  filepath.Join(baseDir, currentDir, ps.editTracksOrig[ti].File),
-				dstPath:  filepath.Join(baseDir, currentDir, ps.editTracks[ti].File),
+				srcPath:  filepath.Join(baseDir, trackDir, ps.editTracksOrig[ti].File),
+				dstPath:  filepath.Join(baseDir, trackDir, ps.editTracks[ti].File),
 			})
 		}
 	}
@@ -697,6 +880,8 @@ func (ps *PlayerState) applyNextStep() tea.Cmd {
 			err = renameOrMerge(cmd.srcPath, cmd.dstPath)
 		case applyOpStripArt:
 			err = kid3StripPicture(cmd.srcPath)
+		case applyOpCoverInstall:
+			err = copyFile(cmd.srcPath, cmd.dstPath)
 		}
 		return applyStepMsg{err: err}
 	}
@@ -735,6 +920,11 @@ func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
 		if fieldIdx == 4 {
 			ps.editStripEmbeddedArt = false
 			ps.editHasEmbeddedArt = false
+			if ps.editCoverPending {
+				ps.editCoverPending = false
+				ps.editHasCoverFile = true
+				ps.editCoverFile = ps.editAlbum[4]
+			}
 		}
 		return
 	}
@@ -754,13 +944,24 @@ func (ps *PlayerState) applyFinishCmd() tea.Cmd {
 	client := ps.mpdClient
 	return func() tea.Msg {
 		client.Update("")
-		return applyFinishMsg{}
+		musicData, _ := LoadMusicData(client)
+		return applyFinishMsg{musicData: musicData}
 	}
 }
 
-func (ps *PlayerState) handleApplyFinish(_ applyFinishMsg) (tea.Model, tea.Cmd) {
+func (ps *PlayerState) handleApplyFinish(msg applyFinishMsg) (tea.Model, tea.Cmd) {
 	ps.applyQueue = nil
 	ps.editFocus = ps.applyReturnFocus
 	ps.mode = ModeEdit
+
+	if msg.musicData != nil {
+		ps.musicData = msg.musicData
+		if ps.albumSelected >= len(ps.musicData.Albums) {
+			ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
+		}
+		ps.editAlbumFixOffset()
+		ps.editLoadAlbum()
+	}
+
 	return ps, nil
 }

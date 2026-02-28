@@ -37,7 +37,7 @@ func (ps *PlayerState) renderHelp() string {
 	case ModeSearching:
 		modeLabel = "Searching"
 		entries = searchingKeys.bindings()
-	case ModeEdit, ModeEditInput, ModeEditSearch, ModeEditSearching, ModeEditApply:
+	case ModeEdit, ModeEditInput, ModeEditSearch, ModeEditSearching, ModeEditApply, ModeEditCoverInput, ModeEditCoverResults:
 		modeLabel = "Edit"
 		entries = editCenterKeys.bindings()
 	}
@@ -136,7 +136,7 @@ func (ps *PlayerState) View() string {
 		return ps.renderHelp()
 	}
 
-	if ps.mode == ModeEdit || ps.mode == ModeEditInput || ps.mode == ModeEditSearch || ps.mode == ModeEditSearching || ps.mode == ModeEditApply {
+	if ps.mode == ModeEdit || ps.mode == ModeEditInput || ps.mode == ModeEditSearch || ps.mode == ModeEditSearching || ps.mode == ModeEditApply || ps.mode == ModeEditCoverInput || ps.mode == ModeEditCoverResults {
 		return ps.renderEditView()
 	}
 

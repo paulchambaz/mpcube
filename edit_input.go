@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +23,7 @@ type editCenterKeyMap struct {
 	edit      key.Binding
 	editor    key.Binding
 	sync      key.Binding
+	revSync   key.Binding
 	revert    key.Binding
 	revertAll key.Binding
 	apply     key.Binding
@@ -42,6 +44,7 @@ var editCenterKeys = editCenterKeyMap{
 	edit:      key.NewBinding(key.WithKeys("i", "enter"), key.WithHelp("i", "edit field")),
 	editor:    key.NewBinding(key.WithKeys("v"), key.WithHelp("v", "editor")),
 	sync:      key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sync filenames")),
+	revSync:   key.NewBinding(key.WithKeys("S"), key.WithHelp("S", "reverse sync")),
 	revert:    key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "revert")),
 	revertAll: key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "revert all")),
 	apply:     key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "apply field")),
@@ -120,7 +123,9 @@ func (ps *PlayerState) handleEdit(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps.handleEditAlbums(msg)
 	case EditFocusTitles:
 		return ps.handleEditTitles(msg)
-	case EditFocusMetadata, EditFocusCover, EditFocusDownload:
+	case EditFocusCover:
+		return ps.handleEditCover(msg)
+	case EditFocusMetadata, EditFocusDownload:
 		return ps.handleEditRight(msg)
 	}
 	return ps, nil
@@ -160,6 +165,8 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps, ps.editOpenEditor()
 	case key.Matches(msg, editCenterKeys.sync):
 		ps.editSyncFilenames()
+	case key.Matches(msg, editCenterKeys.revSync):
+		ps.editReverseSyncFilenames()
 	case key.Matches(msg, editCenterKeys.revert):
 		ps.editRevertField()
 	case key.Matches(msg, editCenterKeys.revertAll):
@@ -179,6 +186,18 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editEnterSearch()
 	case key.Matches(msg, editCenterKeys.openCover):
 		ps.editOpenCover()
+	case msg.String() == "J":
+		if ps.albumSelected < len(ps.musicData.Albums)-1 {
+			ps.albumSelected++
+			ps.editAlbumFixOffset()
+			ps.editLoadAlbum()
+		}
+	case msg.String() == "K":
+		if ps.albumSelected > 0 {
+			ps.albumSelected--
+			ps.editAlbumFixOffset()
+			ps.editLoadAlbum()
+		}
 	}
 	return ps, nil
 }
@@ -213,6 +232,8 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editEnterSearch()
 	case key.Matches(msg, editCenterKeys.sync):
 		ps.editSyncFilenames()
+	case key.Matches(msg, editCenterKeys.revSync):
+		ps.editReverseSyncFilenames()
 	case key.Matches(msg, editCenterKeys.applyAll):
 		cmds := ps.editBuildApplyAll()
 		if len(cmds) > 0 {
@@ -253,6 +274,8 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editFixTitleOffset()
 	case key.Matches(msg, editCenterKeys.sync):
 		ps.editSyncFilenames()
+	case key.Matches(msg, editCenterKeys.revSync):
+		ps.editReverseSyncFilenames()
 	case key.Matches(msg, editCenterKeys.applyAll):
 		cmds := ps.editBuildApplyAll()
 		if len(cmds) > 0 {
@@ -490,6 +513,187 @@ func (ps *PlayerState) editOpenEditor() tea.Cmd {
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return editorFinishedMsg{err: err, tempFile: tmpFile.Name()}
 	})
+}
+
+func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, editCenterKeys.quit):
+		return ps, ps.exitEditMode()
+	case key.Matches(msg, editCenterKeys.left):
+		ps.editFocus = EditFocusCenter
+	case msg.String() == "i":
+		ps.editInputBuf = ps.editCoverSearch
+		ps.editInputPos = len(ps.editInputBuf)
+		ps.editCoverError = ""
+		ps.mode = ModeEditCoverInput
+	case msg.String() == "enter":
+		ps.editCoverLoading = true
+		ps.editCoverDownloading = false
+		ps.editCoverError = ""
+		return ps, coverSearchCmd(ps.editCoverSearch)
+	case key.Matches(msg, editCenterKeys.search):
+		ps.editEnterSearch()
+	case msg.String() == "j" || msg.String() == "down":
+		if len(ps.editCoverResults) > 0 && ps.editCoverResultIdx < len(ps.editCoverResults)-1 {
+			ps.editCoverResultIdx++
+			ps.coverFixResultOffset()
+		}
+	case msg.String() == "k" || msg.String() == "up":
+		if len(ps.editCoverResults) > 0 && ps.editCoverResultIdx > 0 {
+			ps.editCoverResultIdx--
+			ps.coverFixResultOffset()
+		}
+	case key.Matches(msg, editCenterKeys.openCover):
+		if len(ps.editCoverResults) > 0 {
+			return ps.coverDownloadToTemp(true)
+		}
+	case msg.String() == "U":
+		cmds := ps.editBuildApplyAll()
+		if len(cmds) > 0 {
+			return ps, ps.editStartApply(cmds)
+		}
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleEditCoverInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEscape:
+		ps.editInputBuf = ""
+		ps.editInputPos = 0
+		ps.mode = ModeEdit
+	case tea.KeyEnter:
+		ps.editCoverSearch = ps.editInputBuf
+		ps.editInputBuf = ""
+		ps.editInputPos = 0
+		ps.editCoverLoading = true
+		ps.editCoverDownloading = false
+		ps.mode = ModeEdit
+		return ps, coverSearchCmd(ps.editCoverSearch)
+	case tea.KeyLeft:
+		if ps.editInputPos > 0 {
+			ps.editInputPos--
+		}
+	case tea.KeyRight:
+		if ps.editInputPos < len(ps.editInputBuf) {
+			ps.editInputPos++
+		}
+	case tea.KeyHome:
+		ps.editInputPos = 0
+	case tea.KeyEnd:
+		ps.editInputPos = len(ps.editInputBuf)
+	case tea.KeyBackspace:
+		if ps.editInputPos > 0 {
+			ps.editInputBuf = ps.editInputBuf[:ps.editInputPos-1] + ps.editInputBuf[ps.editInputPos:]
+			ps.editInputPos--
+		}
+	case tea.KeyDelete:
+		if ps.editInputPos < len(ps.editInputBuf) {
+			ps.editInputBuf = ps.editInputBuf[:ps.editInputPos] + ps.editInputBuf[ps.editInputPos+1:]
+		}
+	case tea.KeySpace:
+		ps.editInputBuf = ps.editInputBuf[:ps.editInputPos] + " " + ps.editInputBuf[ps.editInputPos:]
+		ps.editInputPos++
+	case tea.KeyRunes:
+		ps.editInputBuf = ps.editInputBuf[:ps.editInputPos] + string(msg.Runes) + ps.editInputBuf[ps.editInputPos:]
+		ps.editInputPos += len(string(msg.Runes))
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleEditCoverResults(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if ps.editCoverError != "" {
+		ps.editCoverError = ""
+		return ps, nil
+	}
+	if ps.editTileNav(msg.String()) {
+		ps.mode = ModeEdit
+		return ps, nil
+	}
+	switch {
+	case msg.String() == "esc" || msg.String() == "q":
+		ps.editCoverResults = nil
+		ps.editCoverResultIdx = 0
+		ps.editCoverResultOffset = 0
+		ps.mode = ModeEdit
+	case msg.String() == "j" || msg.String() == "down":
+		if ps.editCoverResultIdx < len(ps.editCoverResults)-1 {
+			ps.editCoverResultIdx++
+			ps.coverFixResultOffset()
+		}
+	case msg.String() == "k" || msg.String() == "up":
+		if ps.editCoverResultIdx > 0 {
+			ps.editCoverResultIdx--
+			ps.coverFixResultOffset()
+		}
+	case msg.String() == "g" || msg.String() == "home":
+		ps.editCoverResultIdx = 0
+		ps.editCoverResultOffset = 0
+	case msg.String() == "G" || msg.String() == "end":
+		ps.editCoverResultIdx = max(0, len(ps.editCoverResults)-1)
+		ps.coverFixResultOffset()
+	case msg.String() == "enter":
+		if len(ps.editCoverResults) > 0 {
+			return ps.coverDownloadToTemp(false)
+		}
+	case msg.String() == "o":
+		if len(ps.editCoverResults) > 0 {
+			return ps.coverDownloadToTemp(true)
+		}
+	case msg.String() == "i":
+		ps.editInputBuf = ps.editCoverSearch
+		ps.editInputPos = len(ps.editInputBuf)
+		ps.mode = ModeEditCoverInput
+	case msg.String() == "U":
+		cmds := ps.editBuildApplyAll()
+		if len(cmds) > 0 {
+			return ps, ps.editStartApply(cmds)
+		}
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) coverDownloadToTemp(openAfter bool) (tea.Model, tea.Cmd) {
+	selected := ps.editCoverResults[ps.editCoverResultIdx]
+
+	// Reuse existing temp if same release group
+	if ps.editCoverPreviewMBID == selected.releaseGroup && ps.editCoverPreviewPath != "" {
+		if _, err := os.Stat(ps.editCoverPreviewPath); err == nil {
+			ext := filepath.Ext(ps.editCoverPreviewPath)
+			ps.editAlbum[4] = "cover" + ext
+			ps.editCoverPending = true
+			if openAfter {
+				c := exec.Command("xdg-open", ps.editCoverPreviewPath)
+				if err := c.Start(); err == nil {
+					go c.Wait()
+				}
+			}
+			return ps, nil
+		}
+	}
+
+	ps.editCoverLoading = true
+	ps.editCoverDownloading = true
+	ps.editCoverOpenAfterDownload = openAfter
+	tmpPath := filepath.Join(os.TempDir(), "mpcube-cover-"+selected.releaseGroup)
+	return ps, coverDownloadCmd(selected.releaseGroup, tmpPath)
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }
 
 func (ps *PlayerState) handleEditorFinished(msg editorFinishedMsg) {

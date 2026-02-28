@@ -43,7 +43,7 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps, tea.Quit
 	}
 
-	if ps.mode == ModeEditApply {
+	if ps.mode == ModeEditApply || ps.editCoverLoading {
 		return ps, nil
 	}
 
@@ -57,7 +57,7 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps, nil
 	}
 
-	if ps.mode != ModeSearch && ps.mode != ModeEditInput && ps.mode != ModeEditSearch {
+	if ps.mode != ModeSearch && ps.mode != ModeEditInput && ps.mode != ModeEditSearch && ps.mode != ModeEditCoverInput {
 		switch {
 		case key.Matches(msg, globalKeys.seekForward):
 			_ = ps.seekForward()
@@ -91,6 +91,10 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps.handleEditSearch(msg)
 	case ModeEditSearching:
 		return ps.handleEditSearching(msg)
+	case ModeEditCoverInput:
+		return ps.handleEditCoverInput(msg)
+	case ModeEditCoverResults:
+		return ps.handleEditCoverResults(msg)
 	}
 	return ps, nil
 }

@@ -26,7 +26,7 @@ func kid3ReadTags(path string) (map[string]string, error) {
 func kid3WriteTags(path string, tags map[string]string) error {
 	var args []string
 	for key, val := range tags {
-		args = append(args, "-c", "set "+key+" \""+strings.ReplaceAll(val, "\"", "\\\"")+"\"")
+		args = append(args, "-c", "set \""+key+"\" \""+strings.ReplaceAll(val, "\"", "\\\"")+"\"")
 	}
 	args = append(args, path)
 	cmd := exec.Command("kid3-cli", args...)
@@ -37,7 +37,7 @@ func kid3WriteTags(path string, tags map[string]string) error {
 }
 
 func kid3StripPicture(path string) error {
-	cmd := exec.Command("kid3-cli", "-c", "remove Picture", path)
+	cmd := exec.Command("kid3-cli", "-c", `set Picture "" 2`, path)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("kid3-cli failed for %s: %w: %s", path, err, out)
 	}
@@ -47,7 +47,7 @@ func kid3StripPicture(path string) error {
 func kid3WriteTagsBatch(dir string, tags map[string]string) error {
 	var args []string
 	for key, val := range tags {
-		args = append(args, "-c", "set "+key+" \""+strings.ReplaceAll(val, "\"", "\\\"")+"\"")
+		args = append(args, "-c", "set \""+key+"\" \""+strings.ReplaceAll(val, "\"", "\\\"")+"\"")
 	}
 	args = append(args, dir)
 	cmd := exec.Command("kid3-cli", args...)

@@ -21,6 +21,8 @@ const (
 	ModeEditSearch
 	ModeEditSearching
 	ModeEditApply
+	ModeEditCoverInput
+	ModeEditCoverResults
 )
 
 type PlayerState struct {
@@ -72,7 +74,17 @@ type PlayerState struct {
 	editCoverFile      string
 	editHasEmbeddedArt   bool
 	editStripEmbeddedArt bool
-	editCoverSearch      string
+	editCoverSearch           string
+	editCoverResults          []coverResult
+	editCoverResultIdx        int
+	editCoverResultOffset     int
+	editCoverLoading          bool
+	editCoverError            string
+	editCoverPreviewPath      string
+	editCoverPreviewMBID      string
+	editCoverPending            bool
+	editCoverDownloading        bool
+	editCoverOpenAfterDownload  bool
 	editInputBuf       string
 	editInputPos       int
 
@@ -163,7 +175,9 @@ type applyStepMsg struct {
 	err error
 }
 
-type applyFinishMsg struct{}
+type applyFinishMsg struct {
+	musicData *MusicData
+}
 
 type libraryReloadMsg struct {
 	musicData *MusicData
@@ -195,6 +209,12 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case applyFinishMsg:
 		return ps.handleApplyFinish(msg)
+
+	case coverSearchMsg:
+		return ps.handleCoverSearch(msg)
+
+	case coverDownloadMsg:
+		return ps.handleCoverDownload(msg)
 
 	case libraryReloadMsg:
 		if msg.musicData != nil {

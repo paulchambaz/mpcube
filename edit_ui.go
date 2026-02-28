@@ -183,14 +183,102 @@ func (ps *PlayerState) renderEditCoverPanel(width, height int) string {
 
 	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 
-	search := ps.editCoverSearch
-	maxSearch := width - len(" Search: ") - 1
-	if len(search) > maxSearch {
-		search = search[:maxSearch]
-	}
-	content := dimStyle.Render(" Search: " + search)
+	var lines []string
 
-	return topStyle.Render(topBorder) + "\n" + contentStyle.Render(content)
+	// Search bar line
+	if ps.mode == ModeEditCoverInput {
+		buf := ps.editInputBuf
+		pos := ps.editInputPos
+		maxW := width - len(" Search: ") - 2
+		visStart := 0
+		if pos > visStart+maxW {
+			visStart = pos - maxW
+		}
+		visEnd := min(len(buf), visStart+maxW)
+		cursorInVis := pos - visStart
+
+		before := buf[visStart : visStart+cursorInVis]
+		var cursorChar string
+		if pos < len(buf) {
+			cursorChar = string(buf[pos])
+		} else {
+			cursorChar = " "
+		}
+		after := ""
+		if pos+1 < len(buf) && pos+1 <= visEnd {
+			after = buf[pos+1 : visEnd]
+		}
+
+		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true).Reverse(true)
+		searchLine := dimStyle.Render(" Search: "+before) + cursorStyle.Render(cursorChar) + dimStyle.Render(after)
+		lines = append(lines, searchLine)
+	} else if ps.editCoverLoading {
+		if ps.editCoverDownloading {
+			lines = append(lines, dimStyle.Render(" Downloading..."))
+		} else {
+			lines = append(lines, dimStyle.Render(" Searching..."))
+		}
+	} else {
+		search := ps.editCoverSearch
+		maxSearch := width - len(" Search: ") - 1
+		if len(search) > maxSearch {
+			search = search[:maxSearch]
+		}
+		lines = append(lines, dimStyle.Render(" Search: "+search))
+	}
+
+	// Error line
+	if ps.editCoverError != "" {
+		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+		errMsg := ps.editCoverError
+		if len(errMsg)+1 > width {
+			errMsg = errMsg[:width-1]
+		}
+		lines = append(lines, errStyle.Render(" "+errMsg))
+	} else if len(ps.editCoverResults) > 0 {
+		// Separator
+		sep := " " + strings.Repeat("─", max(0, width-2))
+		lines = append(lines, dimStyle.Render(sep))
+
+		// Results list
+		resultsHeight := height - len(lines)
+		for i := ps.editCoverResultOffset; i < len(ps.editCoverResults) && len(lines)-2 < resultsHeight; i++ {
+			r := ps.editCoverResults[i]
+			isSelected := i == ps.editCoverResultIdx
+
+			label := " " + r.artist + " - " + r.title
+			var meta []string
+			if r.date != "" {
+				year := r.date
+				if len(year) > 4 {
+					year = year[:4]
+				}
+				meta = append(meta, year)
+			}
+			if r.country != "" {
+				meta = append(meta, r.country)
+			}
+			if r.format != "" {
+				meta = append(meta, r.format)
+			}
+			if len(meta) > 0 {
+				label += " (" + strings.Join(meta, ", ") + ")"
+			}
+			if len(label) > width {
+				label = label[:width]
+			}
+
+			style := lipgloss.NewStyle()
+			if isSelected && (focused || ps.mode == ModeEditCoverResults) {
+				style = style.Reverse(true).Foreground(lipgloss.Color("12"))
+			} else {
+				style = style.Foreground(lipgloss.Color("8"))
+			}
+			lines = append(lines, style.Render(fmt.Sprintf("%-*s", width, label)))
+		}
+	}
+
+	return topStyle.Render(topBorder) + "\n" + contentStyle.Render(strings.Join(lines, "\n"))
 }
 
 func (ps *PlayerState) renderEditEmptyPanel(title string, width, height int, focused bool) string {
@@ -302,7 +390,7 @@ func (ps *PlayerState) renderEditCenterPanel(width, height int) string {
 				if !ps.editHasCoverFile {
 					value = "[missing]"
 				}
-				if ps.editHasEmbeddedArt {
+				if ps.editHasEmbeddedArt && !ps.editStripEmbeddedArt {
 					value += " [emb]"
 				}
 			}
@@ -457,10 +545,26 @@ func (ps *PlayerState) renderEditShortcutBar(width int) string {
 	}
 
 	var shortcuts []shortcut
-	if ps.mode == ModeEditInput {
+	if ps.mode == ModeEditInput || ps.mode == ModeEditCoverInput {
 		shortcuts = []shortcut{
 			{"enter", "confirm"},
 			{"esc", "cancel"},
+		}
+	} else if ps.mode == ModeEditCoverResults {
+		shortcuts = []shortcut{
+			{"enter", "stage"},
+			{"o", "open"},
+			{"i", "search"},
+			{"U", "apply"},
+			{"esc", "back"},
+		}
+	} else if ps.editFocus == EditFocusCover {
+		shortcuts = []shortcut{
+			{"i", "edit search"},
+			{"enter", "search"},
+			{"o", "open"},
+			{"U", "apply"},
+			{"q", "quit"},
 		}
 	} else {
 		shortcuts = []shortcut{
