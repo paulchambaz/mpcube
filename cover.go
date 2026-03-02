@@ -6,11 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type coverResult struct {
@@ -24,16 +21,6 @@ type coverResult struct {
 	format       string
 }
 
-type coverSearchMsg struct {
-	results []coverResult
-	err     error
-}
-
-type coverDownloadMsg struct {
-	path string
-	ext  string
-	err  error
-}
 
 func searchMusicBrainz(query string) ([]coverResult, error) {
 	u := "https://musicbrainz.org/ws/2/release?query=" + strings.ReplaceAll(query, " ", "+") + "&fmt=json&limit=100"
@@ -143,84 +130,28 @@ func downloadCoverArt(releaseGroupID, destPath string) (string, error) {
 	return ext, nil
 }
 
-func coverSearchCmd(query string) tea.Cmd {
-	return func() tea.Msg {
-		results, err := searchMusicBrainz(query)
-		return coverSearchMsg{results: results, err: err}
+func (ps *PlayerState) doCoverSearch(query string) {
+	results, err := searchMusicBrainz(query)
+	if err != nil {
+		ps.editCoverError = err.Error()
+		return
 	}
-}
-
-func coverDownloadCmd(releaseGroupID, destPath string) tea.Cmd {
-	return func() tea.Msg {
-		ext, err := downloadCoverArt(releaseGroupID, destPath)
-		return coverDownloadMsg{path: destPath + ext, ext: ext, err: err}
-	}
-}
-
-func (ps *PlayerState) handleCoverSearch(msg coverSearchMsg) (tea.Model, tea.Cmd) {
-	ps.editCoverLoading = false
-	ps.editCoverDownloading = false
-	if msg.err != nil {
-		ps.editCoverError = msg.err.Error()
-		ps.mode = ModeEdit
-		return ps, nil
-	}
-	ps.editCoverResults = msg.results
+	ps.editCoverResults = results
 	ps.editCoverResultIdx = 0
 	ps.editCoverResultOffset = 0
-	if len(msg.results) == 0 {
+	if len(results) == 0 {
 		ps.editCoverError = "no covers found"
-		ps.mode = ModeEdit
-		return ps, nil
+		return
 	}
 	ps.editCoverError = ""
-	ps.mode = ModeEditCoverResults
-	return ps, nil
-}
-
-func (ps *PlayerState) handleCoverDownload(msg coverDownloadMsg) (tea.Model, tea.Cmd) {
-	ps.editCoverLoading = false
-	ps.editCoverDownloading = false
-	if msg.err != nil {
-		ps.editCoverError = msg.err.Error()
-		ps.mode = ModeEditCoverResults
-		return ps, nil
-	}
-
-	ps.editCoverPreviewPath = msg.path
-	if ps.editCoverResultIdx < len(ps.editCoverResults) {
-		ps.editCoverPreviewMBID = ps.editCoverResults[ps.editCoverResultIdx].releaseGroup
-	}
-	ps.editAlbum[4] = "cover" + msg.ext
-	ps.editCoverPending = true
-	ps.mode = ModeEditCoverResults
-
-	if ps.editCoverOpenAfterDownload {
-		ps.editCoverOpenAfterDownload = false
-		c := exec.Command("xdg-open", msg.path)
-		if err := c.Start(); err == nil {
-			go c.Wait()
-		}
-	}
-
-	return ps, nil
 }
 
 func (ps *PlayerState) coverFixResultOffset() {
-	panelHeight := ps.editCoverResultsHeight()
-	if panelHeight <= 0 {
+	h := ps.editCoverResultsHeight()
+	if h <= 0 {
 		return
 	}
-	padding := min(1, panelHeight/4)
-
-	if ps.editCoverResultIdx < ps.editCoverResultOffset+padding {
-		ps.editCoverResultOffset = ps.editCoverResultIdx - padding
-	}
-	if ps.editCoverResultIdx >= ps.editCoverResultOffset+panelHeight-padding {
-		ps.editCoverResultOffset = ps.editCoverResultIdx - panelHeight + 1 + padding
-	}
-	ps.editCoverResultOffset = max(ps.editCoverResultOffset, 0)
-	ps.editCoverResultOffset = min(ps.editCoverResultOffset, max(0, len(ps.editCoverResults)-panelHeight))
+	ps.editCoverResultOffset = clampOffset(ps.editCoverResultOffset, ps.editCoverResultIdx, h, min(1, h/4), len(ps.editCoverResults))
 }
 
 func (ps *PlayerState) editCoverResultsHeight() int {

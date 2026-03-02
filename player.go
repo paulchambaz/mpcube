@@ -20,9 +20,7 @@ const (
 	ModeEditInput
 	ModeEditSearch
 	ModeEditSearching
-	ModeEditApply
 	ModeEditCoverInput
-	ModeEditCoverResults
 )
 
 type PlayerState struct {
@@ -78,20 +76,14 @@ type PlayerState struct {
 	editCoverResults          []coverResult
 	editCoverResultIdx        int
 	editCoverResultOffset     int
-	editCoverLoading          bool
 	editCoverError            string
 	editCoverPreviewPath      string
 	editCoverPreviewMBID      string
-	editCoverPending            bool
-	editCoverDownloading        bool
-	editCoverOpenAfterDownload  bool
+	editCoverPending bool
 	editInputBuf       string
 	editInputPos       int
 
-	applyQueue       []applyCmd
-	applyProgress    int
-	applyError       string
-	applyReturnFocus EditFocus
+	applyError string
 }
 
 func NewPlayerState(config Config, musicData *MusicData, mpdClient *mpd.Client) (*PlayerState, error) {
@@ -171,18 +163,6 @@ func (ps *PlayerState) tickCmd() tea.Cmd {
 
 type tickMsg struct{}
 
-type applyStepMsg struct {
-	err error
-}
-
-type applyFinishMsg struct {
-	musicData *MusicData
-}
-
-type libraryReloadMsg struct {
-	musicData *MusicData
-}
-
 func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -202,26 +182,6 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editorFinishedMsg:
 		ps.handleEditorFinished(msg)
-		return ps, nil
-
-	case applyStepMsg:
-		return ps.handleApplyStep(msg)
-
-	case applyFinishMsg:
-		return ps.handleApplyFinish(msg)
-
-	case coverSearchMsg:
-		return ps.handleCoverSearch(msg)
-
-	case coverDownloadMsg:
-		return ps.handleCoverDownload(msg)
-
-	case libraryReloadMsg:
-		if msg.musicData != nil {
-			ps.musicData = msg.musicData
-			ps.updateMPDState()
-			ps.resize()
-		}
 		return ps, nil
 
 	case tea.KeyMsg:

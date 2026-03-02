@@ -37,7 +37,7 @@ func (ps *PlayerState) renderHelp() string {
 	case ModeSearching:
 		modeLabel = "Searching"
 		entries = searchingKeys.bindings()
-	case ModeEdit, ModeEditInput, ModeEditSearch, ModeEditSearching, ModeEditApply, ModeEditCoverInput, ModeEditCoverResults:
+	case ModeEdit, ModeEditInput, ModeEditSearch, ModeEditSearching, ModeEditCoverInput:
 		modeLabel = "Edit"
 		entries = editCenterKeys.bindings()
 	}
@@ -136,7 +136,7 @@ func (ps *PlayerState) View() string {
 		return ps.renderHelp()
 	}
 
-	if ps.mode == ModeEdit || ps.mode == ModeEditInput || ps.mode == ModeEditSearch || ps.mode == ModeEditSearching || ps.mode == ModeEditApply || ps.mode == ModeEditCoverInput || ps.mode == ModeEditCoverResults {
+	if ps.mode == ModeEdit || ps.mode == ModeEditInput || ps.mode == ModeEditSearch || ps.mode == ModeEditSearching || ps.mode == ModeEditCoverInput {
 		return ps.renderEditView()
 	}
 
@@ -224,28 +224,8 @@ func (ps *PlayerState) renderInfoBar(width int) string {
 }
 
 func (ps *PlayerState) resize() {
-	panelHeight := ps.windowHeight - 4
-	padding := min(ps.config.ScrollPadding, panelHeight/4)
-
-	if ps.albumSelected < ps.albumOffset+padding {
-		ps.albumOffset = ps.albumSelected - padding
-	}
-
-	if ps.albumSelected >= ps.albumOffset+panelHeight-padding {
-		ps.albumOffset = ps.albumSelected - panelHeight + 1 + padding
-	}
-
-	ps.albumOffset = max(ps.albumOffset, 0)
-	ps.albumOffset = min(ps.albumOffset, max(0, len(ps.musicData.Albums)-panelHeight))
-
-	if ps.trackSelected < ps.trackOffset+padding {
-		ps.trackOffset = ps.trackSelected - padding
-	}
-
-	if ps.trackSelected >= ps.trackOffset+panelHeight-padding {
-		ps.trackOffset = ps.trackSelected - panelHeight + 1 + padding
-	}
-
-	ps.trackOffset = max(ps.trackOffset, 0)
-	ps.trackOffset = min(ps.trackOffset, max(0, len(ps.musicData.Albums[ps.albumSelected].Songs)-panelHeight))
+	h := ps.windowHeight - 4
+	pad := min(ps.config.ScrollPadding, h/4)
+	ps.albumOffset = clampOffset(ps.albumOffset, ps.albumSelected, h, pad, len(ps.musicData.Albums))
+	ps.trackOffset = clampOffset(ps.trackOffset, ps.trackSelected, h, pad, len(ps.musicData.Albums[ps.albumSelected].Songs))
 }

@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type EditFocus int
@@ -33,11 +31,7 @@ type editTrackState struct {
 
 const editAlbumFieldCount = 5
 
-func (ps *PlayerState) enterEditMode() {
-	if len(ps.musicData.Albums) == 0 {
-		return
-	}
-
+func (ps *PlayerState) editLoadAlbumData() {
 	album := ps.musicData.Albums[ps.albumSelected]
 	if len(album.Songs) == 0 {
 		return
@@ -98,13 +92,25 @@ func (ps *PlayerState) enterEditMode() {
 	}
 	ps.editCoverSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
 
-	ps.editFocus = EditFocusCenter
-	ps.editLastLeft = EditFocusAlbums
-	ps.editLastRight = EditFocusMetadata
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
 	ps.editTitleIdx = 0
 	ps.editTitleOffset = 0
+}
+
+func (ps *PlayerState) enterEditMode() {
+	if len(ps.musicData.Albums) == 0 {
+		return
+	}
+	ps.editLoadAlbumData()
+	ps.editStripEmbeddedArt = false
+	ps.editCoverPending = false
+	ps.editCoverResults = nil
+	ps.editCoverResultIdx = 0
+	ps.editCoverResultOffset = 0
+	ps.editFocus = EditFocusCenter
+	ps.editLastLeft = EditFocusAlbums
+	ps.editLastRight = EditFocusMetadata
 	ps.editInputBuf = ""
 	ps.editInputPos = 0
 	ps.mode = ModeEdit
@@ -112,7 +118,7 @@ func (ps *PlayerState) enterEditMode() {
 	ps.editFixTitleOffset()
 }
 
-func (ps *PlayerState) exitEditMode() tea.Cmd {
+func (ps *PlayerState) exitEditMode() {
 	ps.editAlbum = [5]string{}
 	ps.editAlbumOrig = [5]string{}
 	ps.editTracks = nil
@@ -126,11 +132,8 @@ func (ps *PlayerState) exitEditMode() tea.Cmd {
 	ps.editCoverResults = nil
 	ps.editCoverResultIdx = 0
 	ps.editCoverResultOffset = 0
-	ps.editCoverLoading = false
 	ps.editCoverError = ""
 	ps.editCoverPending = false
-	ps.editCoverDownloading = false
-	ps.editCoverOpenAfterDownload = false
 	if ps.editCoverPreviewPath != "" {
 		os.Remove(ps.editCoverPreviewPath)
 		ps.editCoverPreviewPath = ""
@@ -143,12 +146,7 @@ func (ps *PlayerState) exitEditMode() tea.Cmd {
 	ps.editInputBuf = ""
 	ps.editInputPos = 0
 	ps.mode = ModeNormal
-	client := ps.mpdClient
-	return func() tea.Msg {
-		client.Update("")
-		musicData, _ := LoadMusicData(client)
-		return libraryReloadMsg{musicData: musicData}
-	}
+	ps.update()
 }
 
 func (ps *PlayerState) editFieldCount() int {
@@ -265,75 +263,12 @@ func (ps *PlayerState) editIsModified(idx int) bool {
 }
 
 func (ps *PlayerState) editLoadAlbum() {
-	album := ps.musicData.Albums[ps.albumSelected]
-	if len(album.Songs) == 0 {
-		return
-	}
-
-	dir := filepath.Dir(album.Songs[0].URI)
-	if dir == "." {
-		dir = ""
-	}
-
-	albumDir := filepath.Join(ps.config.MusicDir, dir)
-	coverFile := detectCoverFile(albumDir)
-	if coverFile != "" {
-		ps.editCoverFile = coverFile
-		ps.editHasCoverFile = true
-	} else {
-		ps.editCoverFile = ""
-		ps.editHasCoverFile = false
-	}
-
-	coverName := "cover.jpg"
-	if coverFile != "" {
-		coverName = coverFile
-	}
-
-	ps.editAlbum = [5]string{
-		album.Album,
-		album.Artist,
-		strconv.Itoa(album.Date),
-		dir,
-		coverName,
-	}
-	ps.editAlbumOrig = ps.editAlbum
-
-	ps.editTracks = make([]editTrackState, len(album.Songs))
-	ps.editTracksOrig = make([]editTrackState, len(album.Songs))
-	ps.editCorrupted = make([]bool, len(album.Songs))
-	for i, song := range album.Songs {
-		songDir := filepath.Dir(song.URI)
-		if songDir == "." {
-			songDir = ""
-		}
-		t := editTrackState{
-			Track: strconv.Itoa(song.Track),
-			Title: song.Title,
-			File:  filepath.Base(song.URI),
-			Dir:   songDir,
-		}
-		ps.editTracks[i] = t
-		ps.editTracksOrig[i] = t
-		ps.editCorrupted[i] = checkFile(filepath.Join(ps.config.MusicDir, song.URI)) != nil
-	}
-
-	if len(album.Songs) > 0 {
-		ps.editHasEmbeddedArt = detectEmbeddedArt(filepath.Join(ps.config.MusicDir, album.Songs[0].URI))
-	} else {
-		ps.editHasEmbeddedArt = false
-	}
+	ps.editLoadAlbumData()
 	ps.editStripEmbeddedArt = false
 	ps.editCoverPending = false
-	ps.editCoverSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
 	ps.editCoverResults = nil
 	ps.editCoverResultIdx = 0
 	ps.editCoverResultOffset = 0
-
-	ps.editFieldIdx = 0
-	ps.editFieldOffset = 0
-	ps.editTitleIdx = 0
-	ps.editTitleOffset = 0
 }
 
 func (ps *PlayerState) editRevertField() {
@@ -829,19 +764,39 @@ func (ps *PlayerState) editTrackValue(ti, fi int) string {
 	return ""
 }
 
-func (ps *PlayerState) editStartApply(cmds []applyCmd) tea.Cmd {
-	if len(cmds) == 0 {
-		return nil
-	}
-	ps.applyQueue = cmds
-	ps.applyProgress = 0
+func (ps *PlayerState) applyAll(cmds []applyCmd) {
 	ps.applyError = ""
-	ps.applyReturnFocus = ps.editFocus
-	ps.editFocus = EditFocusCenter
-	ps.editFieldIdx = cmds[0].fieldIdx
-	ps.editFixCenterOffset()
-	ps.mode = ModeEditApply
-	return ps.applyNextStep()
+	lastFieldIdx := -1
+	for _, cmd := range cmds {
+		if lastFieldIdx >= 0 && cmd.fieldIdx != lastFieldIdx {
+			ps.editApplyUpdateOrig(lastFieldIdx)
+		}
+		var err error
+		switch cmd.op {
+		case applyOpTagWrite:
+			err = kid3WriteTags(cmd.srcPath, cmd.tags)
+		case applyOpRename:
+			err = renameOrMerge(cmd.srcPath, cmd.dstPath)
+		case applyOpStripArt:
+			err = kid3StripPicture(cmd.srcPath)
+		case applyOpCoverInstall:
+			err = copyFile(cmd.srcPath, cmd.dstPath)
+		}
+		if err != nil {
+			ps.applyError = err.Error()
+			return
+		}
+		lastFieldIdx = cmd.fieldIdx
+	}
+	if lastFieldIdx >= 0 {
+		ps.editApplyUpdateOrig(lastFieldIdx)
+	}
+	ps.update()
+	if ps.albumSelected >= len(ps.musicData.Albums) {
+		ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
+	}
+	ps.editAlbumFixOffset()
+	ps.editLoadAlbum()
 }
 
 func renameOrMerge(src, dst string) error {
@@ -869,54 +824,16 @@ func renameOrMerge(src, dst string) error {
 	return os.Remove(src)
 }
 
-func (ps *PlayerState) applyNextStep() tea.Cmd {
-	cmd := ps.applyQueue[ps.applyProgress]
-	return func() tea.Msg {
-		var err error
-		switch cmd.op {
-		case applyOpTagWrite:
-			err = kid3WriteTags(cmd.srcPath, cmd.tags)
-		case applyOpRename:
-			err = renameOrMerge(cmd.srcPath, cmd.dstPath)
-		case applyOpStripArt:
-			err = kid3StripPicture(cmd.srcPath)
-		case applyOpCoverInstall:
-			err = copyFile(cmd.srcPath, cmd.dstPath)
-		}
-		return applyStepMsg{err: err}
-	}
-}
-
-func (ps *PlayerState) handleApplyStep(msg applyStepMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
-		ps.applyError = msg.err.Error()
-		ps.applyQueue = nil
-		ps.mode = ModeEdit
-		return ps, nil
-	}
-
-	completedFieldIdx := ps.applyQueue[ps.applyProgress].fieldIdx
-	ps.applyProgress++
-
-	nextIsNewField := ps.applyProgress >= len(ps.applyQueue) ||
-		ps.applyQueue[ps.applyProgress].fieldIdx != completedFieldIdx
-
-	if nextIsNewField {
-		ps.editApplyUpdateOrig(completedFieldIdx)
-	}
-
-	if ps.applyProgress < len(ps.applyQueue) {
-		ps.editFieldIdx = ps.applyQueue[ps.applyProgress].fieldIdx
-		ps.editFixCenterOffset()
-		return ps, ps.applyNextStep()
-	}
-
-	return ps, ps.applyFinishCmd()
-}
 
 func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
 	if fieldIdx < editAlbumFieldCount {
 		ps.editAlbumOrig[fieldIdx] = ps.editAlbum[fieldIdx]
+		if fieldIdx == 3 {
+			for i := range ps.editTracks {
+				ps.editTracks[i].Dir = ps.editAlbum[3]
+				ps.editTracksOrig[i].Dir = ps.editAlbum[3]
+			}
+		}
 		if fieldIdx == 4 {
 			ps.editStripEmbeddedArt = false
 			ps.editHasEmbeddedArt = false
@@ -940,28 +857,3 @@ func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
 	}
 }
 
-func (ps *PlayerState) applyFinishCmd() tea.Cmd {
-	client := ps.mpdClient
-	return func() tea.Msg {
-		client.Update("")
-		musicData, _ := LoadMusicData(client)
-		return applyFinishMsg{musicData: musicData}
-	}
-}
-
-func (ps *PlayerState) handleApplyFinish(msg applyFinishMsg) (tea.Model, tea.Cmd) {
-	ps.applyQueue = nil
-	ps.editFocus = ps.applyReturnFocus
-	ps.mode = ModeEdit
-
-	if msg.musicData != nil {
-		ps.musicData = msg.musicData
-		if ps.albumSelected >= len(ps.musicData.Albums) {
-			ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
-		}
-		ps.editAlbumFixOffset()
-		ps.editLoadAlbum()
-	}
-
-	return ps, nil
-}

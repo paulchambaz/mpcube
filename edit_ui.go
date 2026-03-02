@@ -212,12 +212,6 @@ func (ps *PlayerState) renderEditCoverPanel(width, height int) string {
 		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true).Reverse(true)
 		searchLine := dimStyle.Render(" Search: "+before) + cursorStyle.Render(cursorChar) + dimStyle.Render(after)
 		lines = append(lines, searchLine)
-	} else if ps.editCoverLoading {
-		if ps.editCoverDownloading {
-			lines = append(lines, dimStyle.Render(" Downloading..."))
-		} else {
-			lines = append(lines, dimStyle.Render(" Searching..."))
-		}
 	} else {
 		search := ps.editCoverSearch
 		maxSearch := width - len(" Search: ") - 1
@@ -269,7 +263,7 @@ func (ps *PlayerState) renderEditCoverPanel(width, height int) string {
 			}
 
 			style := lipgloss.NewStyle()
-			if isSelected && (focused || ps.mode == ModeEditCoverResults) {
+			if isSelected && focused {
 				style = style.Reverse(true).Foreground(lipgloss.Color("12"))
 			} else {
 				style = style.Foreground(lipgloss.Color("8"))
@@ -515,10 +509,6 @@ func (ps *PlayerState) renderEditShortcutBar(width int) string {
 	if ps.mode == ModeEditSearching {
 		return ps.renderEditSearchingBar(width)
 	}
-	if ps.mode == ModeEditApply {
-		return ps.renderEditApplyBar(width)
-	}
-
 	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 
@@ -550,7 +540,7 @@ func (ps *PlayerState) renderEditShortcutBar(width int) string {
 			{"enter", "confirm"},
 			{"esc", "cancel"},
 		}
-	} else if ps.mode == ModeEditCoverResults {
+	} else if ps.editFocus == EditFocusCover && len(ps.editCoverResults) > 0 {
 		shortcuts = []shortcut{
 			{"enter", "stage"},
 			{"o", "open"},
@@ -604,49 +594,5 @@ func (ps *PlayerState) renderEditShortcutBar(width int) string {
 	text := strings.Repeat(" ", pad) + inner
 
 	return lipgloss.NewStyle().Width(width).Height(1).Render(text)
-}
-
-func (ps *PlayerState) renderEditApplyBar(width int) string {
-	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-
-	label := ps.editApplyFieldLabel()
-	progress := ps.applyProgress
-	total := len(ps.applyQueue)
-	counter := fmt.Sprintf(" %d/%d", progress, total)
-
-	barWidth := width - len("Applying  ") - len(label) - len(counter) - 4
-	if barWidth < 4 {
-		barWidth = 4
-	}
-
-	filled := 0
-	if total > 0 {
-		filled = progress * barWidth / total
-	}
-	empty := barWidth - filled
-
-	bar := labelStyle.Render(strings.Repeat("█", filled)) + dimStyle.Render(strings.Repeat("░", empty))
-	text := dimStyle.Render("Applying ") + labelStyle.Render(label) + " " + bar + dimStyle.Render(counter)
-
-	pad := max(0, (width-len("Applying ")-len(label)-1-barWidth-len(counter))/2)
-	text = strings.Repeat(" ", pad) + text
-
-	return lipgloss.NewStyle().Width(width).Height(1).Render(text)
-}
-
-func (ps *PlayerState) editApplyFieldLabel() string {
-	if len(ps.applyQueue) == 0 || ps.applyProgress >= len(ps.applyQueue) {
-		return ""
-	}
-	fieldIdx := ps.applyQueue[ps.applyProgress].fieldIdx
-	if fieldIdx < editAlbumFieldCount {
-		labels := [5]string{"Album", "Artist", "Date", "Dir", "Cover"}
-		return labels[fieldIdx]
-	}
-	ti := ps.editTrackIdx(fieldIdx)
-	fi := ps.editTrackFieldIdx(fieldIdx)
-	trackLabels := [3]string{"Track", "Title", "File"}
-	return fmt.Sprintf("%s %d", trackLabels[fi], ti+1)
 }
 

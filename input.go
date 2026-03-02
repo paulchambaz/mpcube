@@ -43,10 +43,6 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps, tea.Quit
 	}
 
-	if ps.mode == ModeEditApply || ps.editCoverLoading {
-		return ps, nil
-	}
-
 	if key.Matches(msg, globalKeys.help) {
 		if ps.mode == ModeHelp {
 			ps.mode = ps.helpForMode
@@ -93,8 +89,6 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps.handleEditSearching(msg)
 	case ModeEditCoverInput:
 		return ps.handleEditCoverInput(msg)
-	case ModeEditCoverResults:
-		return ps.handleEditCoverResults(msg)
 	}
 	return ps, nil
 }

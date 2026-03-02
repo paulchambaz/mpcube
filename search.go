@@ -82,9 +82,14 @@ func (ps *PlayerState) jumpToMatch(idx int) {
 	}
 	ps.searchMatchIdx = idx
 	ps.albumSelected = ps.searchMatches[idx]
-	ps.trackSelected = 0
-	ps.trackOffset = 0
-	ps.resize()
+	if ps.mode == ModeEditSearch || ps.mode == ModeEditSearching {
+		ps.editAlbumFixOffset()
+		ps.editLoadAlbum()
+	} else {
+		ps.trackSelected = 0
+		ps.trackOffset = 0
+		ps.resize()
+	}
 }
 
 func (ps *PlayerState) enterSearch() {
@@ -129,6 +134,9 @@ func (ps *PlayerState) searchBackspace() {
 	if ps.searchQuery == "" {
 		ps.albumSelected = ps.searchSavedAlbum
 		ps.albumOffset = ps.searchSavedOffset
+		if ps.mode == ModeEditSearch {
+			ps.editLoadAlbum()
+		}
 		return
 	}
 	ps.runSearch()
@@ -197,58 +205,7 @@ func (ps *PlayerState) editConfirmSearch() {
 	}
 }
 
-func (ps *PlayerState) editJumpToMatch(idx int) {
-	if len(ps.searchMatches) == 0 {
-		return
-	}
-	ps.searchMatchIdx = idx
-	ps.albumSelected = ps.searchMatches[idx]
-	ps.editAlbumFixOffset()
-	ps.editLoadAlbum()
-}
 
-func (ps *PlayerState) editSearchAddRune(r rune) {
-	ps.searchQuery += string(r)
-	ps.runSearch()
-	if len(ps.searchMatches) > 0 {
-		ps.editJumpToMatch(0)
-	}
-}
-
-func (ps *PlayerState) editSearchBackspace() {
-	if len(ps.searchQuery) > 0 {
-		ps.searchQuery = ps.searchQuery[:len(ps.searchQuery)-1]
-	}
-	if ps.searchQuery == "" {
-		ps.albumSelected = ps.searchSavedAlbum
-		ps.albumOffset = ps.searchSavedOffset
-		ps.editLoadAlbum()
-		return
-	}
-	ps.runSearch()
-	if len(ps.searchMatches) > 0 {
-		ps.editJumpToMatch(0)
-	}
-}
-
-func (ps *PlayerState) editNextMatch() {
-	if len(ps.searchMatches) == 0 {
-		return
-	}
-	idx := (ps.searchMatchIdx + 1) % len(ps.searchMatches)
-	ps.editJumpToMatch(idx)
-}
-
-func (ps *PlayerState) editPrevMatch() {
-	if len(ps.searchMatches) == 0 {
-		return
-	}
-	idx := ps.searchMatchIdx - 1
-	if idx < 0 {
-		idx = len(ps.searchMatches) - 1
-	}
-	ps.editJumpToMatch(idx)
-}
 
 func (ps *PlayerState) editConfirmSearching() {
 	ps.searchQuery = ""
