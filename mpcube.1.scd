@@ -299,7 +299,7 @@ column. Press */* or *i* to edit your query.
 - *.* - Seek forward by 5 seconds
 - *,* - Seek backward by 5 seconds
 - *=* - Increase volume by 10 percent
-- *-*, *_* - Decrease volume by 10 percent
+- *-*, *\_* - Decrease volume by 10 percent
 - *Ctrl+c* - Quits *mpcube* and clears the *mpd* queue
 
 # AUTHORS
