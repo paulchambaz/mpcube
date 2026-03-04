@@ -37,7 +37,7 @@
           pname = "mpcube";
           version = "1.0.0";
           src = ./.;
-          vendorHash = "sha256-VZuTMhjFEGWHhBJ2pukiIyQrHSo3LAB/2Ig9/5OsGjM=";
+          vendorHash = "sha256-3uicbVncsF5moYFfL3NGQ7Lrg/ABCYyxl8kaPCnq1og=";
           nativeBuildInputs = buildPkgs;
           buildInputs = libPkgs;
           postInstall = ''
