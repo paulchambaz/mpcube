@@ -124,50 +124,50 @@ volume_bar_width = 30
 
 *mpd_host* is the IP address of your MPD instance. If you have installed your
 MPD server on the same computer as *mpcube*, you do not need to change this
-setting. [default: 127.0.0.1]
+setting. (default: 127.0.0.1)
 
 *mpd_port* is the port of your MPD instance. If you have followed this guide or
 did not change the MPD default port, you do not need to change this setting.
-[default: 6600]
+(default: 6600)
 
 *volume_step* is the percentage by which the volume increases or decreases each
 time you press the volume up or volume down key. For example, with the default
-value of 10, each keypress adjusts the volume by 10%. [default: 10]
+value of 10, each keypress adjusts the volume by 10%. (default: 10)
 
 *seek_duration* is the amount of time in milliseconds that the playback position
 moves when you press the seek forward or seek backward key. The default value
-of 5000 means each keypress seeks by 5 seconds. [default: 5000]
+of 5000 means each keypress seeks by 5 seconds. (default: 5000)
 
 *tick_interval* is the interval in milliseconds at which *mpcube* polls the MPD
 server for state updates such as track position, volume changes, and playback
 status. Lower values make the UI more responsive but use slightly more
-resources. [default: 100]
+resources. (default: 100)
 
 *max_retry_delay* is the maximum number of seconds *mpcube* will wait between
 reconnection attempts when the MPD server is unreachable. Retries use
-exponential backoff up to this limit. [default: 30]
+exponential backoff up to this limit. (default: 30)
 
 *scroll_padding* controls how many lines of context remain visible above or
 below the cursor when scrolling through the album or track list. A higher value
 keeps the cursor further from the edge of the panel. On small terminals, the
-padding is reduced proportionally. [default: 5]
+padding is reduced proportionally. (default: 5)
 
 *wide_threshold* is the terminal width in columns above which *mpcube* switches
 to a wide layout with a fixed-width album panel. Below this threshold, the
 album panel takes up a proportional fraction of the terminal width instead.
-[default: 100]
+(default: 100)
 
 *album_width* is the width in columns of the album panel when the terminal is
 wider than *wide_threshold*. This has no effect when the terminal is narrower
-than the threshold. [default: 40]
+than the threshold. (default: 40)
 
 *volume_bar_threshold* is the terminal width in columns above which the volume
 bar uses a fixed width. Below this threshold, the volume bar takes up a
-proportional fraction of the terminal width instead. [default: 90]
+proportional fraction of the terminal width instead. (default: 90)
 
 *volume_bar_width* is the width in columns of the volume bar when the terminal
 is wider than *volume_bar_threshold*. This has no effect when the terminal is
-narrower than the threshold. [default: 30]
+narrower than the threshold. (default: 30)
 
 Environment variables can also be used to override settings. *MPD_HOST* and
 *MPD_PORT* set the MPD connection. All other settings use the *MPCUBE_* prefix
