@@ -31,6 +31,7 @@ type editCenterKeyMap struct {
 	playPause key.Binding
 	search    key.Binding
 	openCover key.Binding
+	gotoCover key.Binding
 }
 
 var editCenterKeys = editCenterKeyMap{
@@ -52,6 +53,7 @@ var editCenterKeys = editCenterKeyMap{
 	playPause: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
 	search:    key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
 	openCover: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open cover")),
+	gotoCover: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "cover panel")),
 }
 
 func (k editCenterKeyMap) bindings() []helpEntry {
@@ -195,6 +197,8 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editEnterSearch()
 	case key.Matches(msg, editCenterKeys.openCover):
 		ps.editOpenCover()
+	case key.Matches(msg, editCenterKeys.gotoCover):
+		ps.editFocus = EditFocusCover
 	case msg.String() == "J":
 		if ps.albumSelected < len(ps.musicData.Albums)-1 {
 			ps.albumSelected++
@@ -254,6 +258,10 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, editCenterKeys.editor):
 		return ps, ps.editOpenEditor()
+	case key.Matches(msg, editCenterKeys.openCover):
+		ps.editOpenCover()
+	case key.Matches(msg, editCenterKeys.gotoCover):
+		ps.editFocus = EditFocusCover
 	}
 	return ps, nil
 }
@@ -300,6 +308,10 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, editCenterKeys.editor):
 		return ps, ps.editOpenEditor()
+	case key.Matches(msg, editCenterKeys.openCover):
+		ps.editOpenCover()
+	case key.Matches(msg, editCenterKeys.gotoCover):
+		ps.editFocus = EditFocusCover
 	}
 	return ps, nil
 }
@@ -551,7 +563,7 @@ func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.mode = ModeEditCoverInput
 	case msg.String() == "enter":
 		if hasResults {
-			ps.coverDownloadToTemp(false)
+			ps.coverDownloadToTemp(true)
 		} else {
 			ps.doCoverSearch(ps.editCoverSearch)
 		}
@@ -579,7 +591,7 @@ func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, editCenterKeys.openCover):
 		if hasResults {
-			ps.coverDownloadToTemp(true)
+			ps.coverDownloadToTemp(false)
 		}
 	case msg.String() == "U":
 		cmds := ps.editBuildApplyAll()
@@ -611,16 +623,18 @@ func (ps *PlayerState) handleEditCoverInput(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	return ps, nil
 }
 
-func (ps *PlayerState) coverDownloadToTemp(openAfter bool) {
+func (ps *PlayerState) coverDownloadToTemp(stageForInstall bool) {
 	selected := ps.editCoverResults[ps.editCoverResultIdx]
 
-	// Reuse existing temp if same release group
-	if ps.editCoverPreviewMBID == selected.releaseGroup && ps.editCoverPreviewPath != "" {
+	// Reuse existing temp if same result entry
+	if ps.editCoverPreviewResultIdx == ps.editCoverResultIdx && ps.editCoverPreviewPath != "" {
 		if _, err := os.Stat(ps.editCoverPreviewPath); err == nil {
 			ext := filepath.Ext(ps.editCoverPreviewPath)
 			ps.editAlbum[4] = "cover" + ext
-			ps.editCoverPending = true
-			if openAfter {
+			if stageForInstall {
+				ps.editCoverPending = true
+			} else {
+				// Preview only - open viewer
 				c := exec.Command(ps.config.ImageViewer, ps.editCoverPreviewPath)
 				if err := c.Start(); err == nil {
 					go c.Wait()
@@ -639,10 +653,12 @@ func (ps *PlayerState) coverDownloadToTemp(openAfter bool) {
 
 	ps.editCoverPreviewPath = tmpPath + ext
 	ps.editCoverPreviewMBID = selected.releaseGroup
+	ps.editCoverPreviewResultIdx = ps.editCoverResultIdx
 	ps.editAlbum[4] = "cover" + ext
-	ps.editCoverPending = true
-
-	if openAfter {
+	if stageForInstall {
+		ps.editCoverPending = true
+	} else {
+		// Preview only - open viewer
 		c := exec.Command(ps.config.ImageViewer, ps.editCoverPreviewPath)
 		if err := c.Start(); err == nil {
 			go c.Wait()

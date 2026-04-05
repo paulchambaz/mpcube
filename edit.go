@@ -141,6 +141,7 @@ func (ps *PlayerState) exitEditMode() {
 		os.Remove(ps.editCoverPreviewPath)
 		ps.editCoverPreviewPath = ""
 		ps.editCoverPreviewMBID = ""
+		ps.editCoverPreviewResultIdx = 0
 	}
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
@@ -922,7 +923,7 @@ func (ps *PlayerState) finishApply() tea.Model {
 	targetArtist := ps.editAlbum[1]
 
 	ps.applyQueue = nil
-	ps.editFocus = ps.applyReturnFocus
+	ps.editFocus = EditFocusAlbums
 	ps.mode = ModeEdit
 
 	// Data already reloaded after last command, just need to find our album

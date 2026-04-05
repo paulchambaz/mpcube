@@ -80,6 +80,7 @@ type PlayerState struct {
 	editCoverError            string
 	editCoverPreviewPath      string
 	editCoverPreviewMBID      string
+	editCoverPreviewResultIdx int
 	editCoverPending bool
 	editInputBuf       string
 	editInputPos       int
