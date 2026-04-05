@@ -202,7 +202,7 @@ func (ps *PlayerState) renderProgressBar(width int) string {
 		Height(1).
 		Foreground(lipgloss.Color("8"))
 
-	if ps.albumPlaying == nil || ps.trackPlaying == nil {
+	if ps.albumPlaying == nil || ps.trackPlaying == nil || ps.position == nil {
 		return contentStyle.Render(fmt.Sprintf(" 00:00 %s 00:00 ", strings.Repeat("─", max(0, width-14))))
 	}
 

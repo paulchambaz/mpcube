@@ -89,6 +89,9 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps.handleEditSearching(msg)
 	case ModeEditCoverInput:
 		return ps.handleEditCoverInput(msg)
+	case ModeEditApply:
+		// Block all input during apply - commands are processed by tick handler
+		return ps, nil
 	}
 	return ps, nil
 }

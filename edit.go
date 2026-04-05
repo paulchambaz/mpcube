@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 type EditFocus int
@@ -146,7 +149,7 @@ func (ps *PlayerState) exitEditMode() {
 	ps.editInputBuf = ""
 	ps.editInputPos = 0
 	ps.mode = ModeNormal
-	ps.update()
+	_ = ps.update()
 }
 
 func (ps *PlayerState) editFieldCount() int {
@@ -263,6 +266,9 @@ func (ps *PlayerState) editIsModified(idx int) bool {
 }
 
 func (ps *PlayerState) editLoadAlbum() {
+	if len(ps.musicData.Albums) == 0 {
+		return
+	}
 	ps.editLoadAlbumData()
 	ps.editStripEmbeddedArt = false
 	ps.editCoverPending = false
@@ -764,41 +770,6 @@ func (ps *PlayerState) editTrackValue(ti, fi int) string {
 	return ""
 }
 
-func (ps *PlayerState) applyAll(cmds []applyCmd) {
-	ps.applyError = ""
-	lastFieldIdx := -1
-	for _, cmd := range cmds {
-		if lastFieldIdx >= 0 && cmd.fieldIdx != lastFieldIdx {
-			ps.editApplyUpdateOrig(lastFieldIdx)
-		}
-		var err error
-		switch cmd.op {
-		case applyOpTagWrite:
-			err = kid3WriteTags(cmd.srcPath, cmd.tags)
-		case applyOpRename:
-			err = renameOrMerge(cmd.srcPath, cmd.dstPath)
-		case applyOpStripArt:
-			err = kid3StripPicture(cmd.srcPath)
-		case applyOpCoverInstall:
-			err = copyFile(cmd.srcPath, cmd.dstPath)
-		}
-		if err != nil {
-			ps.applyError = err.Error()
-			return
-		}
-		lastFieldIdx = cmd.fieldIdx
-	}
-	if lastFieldIdx >= 0 {
-		ps.editApplyUpdateOrig(lastFieldIdx)
-	}
-	ps.update()
-	if ps.albumSelected >= len(ps.musicData.Albums) {
-		ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
-	}
-	ps.editAlbumFixOffset()
-	ps.editLoadAlbum()
-}
-
 func renameOrMerge(src, dst string) error {
 	err := os.Rename(src, dst)
 	if err == nil {
@@ -855,5 +826,150 @@ func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
 	case 2:
 		ps.editTracksOrig[ti].File = ps.editTracks[ti].File
 	}
+}
+
+func (ps *PlayerState) editStartApply(cmds []applyCmd) {
+	if len(cmds) == 0 {
+		return
+	}
+	ps.applyQueue = cmds
+	ps.applyProgress = 0
+	ps.applyError = ""
+	ps.applyReturnFocus = ps.editFocus
+	ps.editFocus = EditFocusCenter
+	ps.editFieldIdx = cmds[0].fieldIdx
+	ps.editFixCenterOffset()
+	ps.mode = ModeEditApply
+}
+
+func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
+	// Safety check
+	if ps.applyProgress >= len(ps.applyQueue) {
+		return ps.finishApply(), ps.tickCmd()
+	}
+
+	// Execute current command
+	cmd := ps.applyQueue[ps.applyProgress]
+	var err error
+	switch cmd.op {
+	case applyOpTagWrite:
+		err = kid3WriteTags(cmd.srcPath, cmd.tags)
+	case applyOpRename:
+		err = renameOrMerge(cmd.srcPath, cmd.dstPath)
+	case applyOpStripArt:
+		err = kid3StripPicture(cmd.srcPath)
+	case applyOpCoverInstall:
+		err = copyFile(cmd.srcPath, cmd.dstPath)
+	}
+
+	// Handle error
+	if err != nil {
+		ps.applyError = err.Error()
+		ps.applyQueue = nil
+		ps.mode = ModeEdit
+		return ps, ps.tickCmd()
+	}
+
+	// Trigger MPD database update and wait for completion
+	if err := ps.updateAndWait(); err != nil {
+		ps.applyError = err.Error()
+		ps.applyQueue = nil
+		ps.mode = ModeEdit
+		return ps, ps.tickCmd()
+	}
+
+	// Reload album edit state with fresh data
+	ps.editLoadAlbum()
+
+	// Track completed field for orig update
+	completedFieldIdx := cmd.fieldIdx
+	ps.applyProgress++
+
+	// Check if next command is for a different field
+	nextIsNewField := ps.applyProgress >= len(ps.applyQueue) ||
+		ps.applyQueue[ps.applyProgress].fieldIdx != completedFieldIdx
+
+	if nextIsNewField {
+		ps.editApplyUpdateOrig(completedFieldIdx)
+	}
+
+	// Update UI to show next field if not done
+	if ps.applyProgress < len(ps.applyQueue) {
+		ps.editFieldIdx = ps.applyQueue[ps.applyProgress].fieldIdx
+		ps.editFixCenterOffset()
+		return ps, ps.tickCmd()
+	}
+
+	// All done
+	return ps.finishApply(), ps.tickCmd()
+}
+
+func (ps *PlayerState) finishApply() tea.Model {
+	// Remember the edited album's identifiers (using the NEW values after edits)
+	targetAlbum := ps.editAlbum[0]
+	targetArtist := ps.editAlbum[1]
+
+	ps.applyQueue = nil
+	ps.editFocus = ps.applyReturnFocus
+	ps.mode = ModeEdit
+
+	// Data already reloaded after last command, just need to find our album
+	// (MPD may have re-sorted the album list)
+	// Find the album we were editing (it might have moved due to re-sorting)
+	foundIdx := -1
+	for i, album := range ps.musicData.Albums {
+		if album.Album == targetAlbum && album.Artist == targetArtist {
+			foundIdx = i
+			break
+		}
+	}
+
+	// Update selection to found album, or clamp to valid range
+	if foundIdx >= 0 {
+		ps.albumSelected = foundIdx
+	} else if ps.albumSelected >= len(ps.musicData.Albums) {
+		ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
+	}
+
+	ps.editAlbumFixOffset()
+	ps.editLoadAlbum()
+
+	return ps
+}
+
+// updateAndWait triggers an MPD database update and waits synchronously for it to complete.
+// Uses native MPD Status() polling to check the "updating_db" field.
+func (ps *PlayerState) updateAndWait() error {
+	// Trigger MPD database update
+	_, err := ps.mpdClient.Update("")
+	if err != nil {
+		return err
+	}
+
+	// Poll until update completes (native MPD pattern)
+	for {
+		status, err := ps.mpdClient.Status()
+		if err != nil {
+			return err
+		}
+
+		// Check if database update is complete
+		// updating_db field is absent (empty string) when scan finishes
+		if status["updating_db"] == "" {
+			break
+		}
+
+		// Still updating - wait a bit before polling again
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Update complete - now load fresh music data
+	musicData, err := LoadMusicData(ps.mpdClient)
+	if err != nil {
+		return err
+	}
+
+	ps.musicData = musicData
+	return ps.updateMPDState()
 }
 

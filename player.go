@@ -21,6 +21,7 @@ const (
 	ModeEditSearch
 	ModeEditSearching
 	ModeEditCoverInput
+	ModeEditApply
 )
 
 type PlayerState struct {
@@ -83,7 +84,10 @@ type PlayerState struct {
 	editInputBuf       string
 	editInputPos       int
 
-	applyError string
+	applyError       string
+	applyQueue       []applyCmd
+	applyProgress    int
+	applyReturnFocus EditFocus
 }
 
 func NewPlayerState(config Config, musicData *MusicData, mpdClient *mpd.Client) (*PlayerState, error) {
@@ -172,6 +176,12 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return ps, nil
 
 	case tickMsg:
+		// Process apply queue if in apply mode
+		if ps.mode == ModeEditApply {
+			return ps.handleApplyTick()
+		}
+
+		// Normal MPD state update
 		if err := ps.updateMPDState(); err != nil {
 			ps.retryCount++
 			delay := time.Duration(math.Min(float64(ps.retryCount*ps.retryCount), float64(ps.config.MaxRetryDelay))) * time.Second

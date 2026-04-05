@@ -174,14 +174,14 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editRevertAll()
 	case key.Matches(msg, editCenterKeys.apply):
 		if ps.editIsModified(ps.editFieldIdx) {
-			ps.applyAll(ps.editBuildApplyField(ps.editFieldIdx))
+			ps.editStartApply(ps.editBuildApplyField(ps.editFieldIdx))
 		}
 	case key.Matches(msg, editCenterKeys.applyAll):
 		cmds := ps.editBuildApplyAll()
 		if len(cmds) > 0 {
-			ps.applyAll(cmds)
+			ps.editStartApply(cmds)
 		} else {
-			ps.update()
+			_ = ps.update()
 			ps.editLoadAlbum()
 		}
 	case key.Matches(msg, editCenterKeys.playPause):
@@ -242,9 +242,9 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, editCenterKeys.applyAll):
 		cmds := ps.editBuildApplyAll()
 		if len(cmds) > 0 {
-			ps.applyAll(cmds)
+			ps.editStartApply(cmds)
 		} else {
-			ps.update()
+			_ = ps.update()
 			ps.editLoadAlbum()
 		}
 	case key.Matches(msg, editCenterKeys.editor):
@@ -288,9 +288,9 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, editCenterKeys.applyAll):
 		cmds := ps.editBuildApplyAll()
 		if len(cmds) > 0 {
-			ps.applyAll(cmds)
+			ps.editStartApply(cmds)
 		} else {
-			ps.update()
+			_ = ps.update()
 			ps.editLoadAlbum()
 		}
 	case key.Matches(msg, editCenterKeys.editor):
@@ -579,9 +579,9 @@ func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "U":
 		cmds := ps.editBuildApplyAll()
 		if len(cmds) > 0 {
-			ps.applyAll(cmds)
+			ps.editStartApply(cmds)
 		} else {
-			ps.update()
+			_ = ps.update()
 			ps.editLoadAlbum()
 		}
 	}
