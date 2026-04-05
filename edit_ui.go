@@ -632,13 +632,24 @@ func (ps *PlayerState) editApplyFieldLabel() string {
 	if len(ps.applyQueue) == 0 || ps.applyProgress >= len(ps.applyQueue) {
 		return ""
 	}
-	fieldIdx := ps.applyQueue[ps.applyProgress].fieldIdx
+
+	cmd := ps.applyQueue[ps.applyProgress] // Get current command
+	fieldIdx := cmd.fieldIdx
+
 	if fieldIdx < editAlbumFieldCount {
 		labels := [5]string{"Album", "Artist", "Date", "Dir", "Cover"}
 		return labels[fieldIdx]
 	}
+
 	ti := ps.editTrackIdx(fieldIdx)
 	fi := ps.editTrackFieldIdx(fieldIdx)
+
+	// For title field with tag writes, show "Track N" (batched operation)
+	if fi == 1 && cmd.op == applyOpTagWrite {
+		return fmt.Sprintf("Track %d", ti+1)
+	}
+
+	// For other operations, show specific field
 	trackLabels := [3]string{"Track", "Title", "File"}
 	return fmt.Sprintf("%s %d", trackLabels[fi], ti+1)
 }

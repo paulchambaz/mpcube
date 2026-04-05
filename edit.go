@@ -682,21 +682,9 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 	currentDir := ps.editAlbumOrig[3]
 	var cmds []applyCmd
 
-	for idx := 0; idx < 3; idx++ {
-		if !ps.editIsModified(idx) {
-			continue
-		}
-		for i, track := range ps.editTracksOrig {
-			val := ps.editAlbumTagValue(idx, i)
-			cmds = append(cmds, applyCmd{
-				fieldIdx: idx,
-				op:       applyOpTagWrite,
-				srcPath:  filepath.Join(baseDir, track.Dir, track.File),
-				tags:     map[string]string{albumTagNames[idx]: val},
-			})
-		}
-	}
+	// SECTION 1: Non-batchable album operations (execute first)
 
+	// Directory rename
 	if ps.editIsModified(3) {
 		cmds = append(cmds, applyCmd{
 			fieldIdx: 3,
@@ -707,6 +695,7 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 		currentDir = ps.editAlbum[3]
 	}
 
+	// Cover operations
 	if ps.editCoverPending {
 		cmds = append(cmds, applyCmd{
 			fieldIdx: 4,
@@ -723,35 +712,57 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 		})
 	}
 
-	if ps.editStripEmbeddedArt {
-		for _, track := range ps.editTracksOrig {
-			cmds = append(cmds, applyCmd{
-				fieldIdx: 4,
-				op:       applyOpStripArt,
-				srcPath:  filepath.Join(baseDir, track.Dir, track.File),
-			})
-		}
-	}
+	// SECTION 2: Per-file batched operations (in track order)
 
 	for ti := 0; ti < len(ps.editTracks); ti++ {
 		baseIdx := editAlbumFieldCount + ti*3
 		trackDir := ps.editTracksOrig[ti].Dir
-		for fi := 0; fi < 2; fi++ {
-			if !ps.editIsModified(baseIdx + fi) {
-				continue
+		trackFile := ps.editTracksOrig[ti].File
+		trackPath := filepath.Join(baseDir, trackDir, trackFile)
+
+		// Collect all tag writes for this track
+		tags := make(map[string]string)
+
+		// Album-level tags (Album, Artist, Date)
+		for idx := 0; idx < 3; idx++ {
+			if ps.editIsModified(idx) {
+				val := ps.editAlbumTagValue(idx, ti)
+				tags[albumTagNames[idx]] = val
 			}
+		}
+
+		// Track-level tags (Track Number, Title)
+		for fi := 0; fi < 2; fi++ {
+			if ps.editIsModified(baseIdx + fi) {
+				tags[trackTagNames[fi]] = ps.editTrackValue(ti, fi)
+			}
+		}
+
+		// Strip embedded art (must come before tag writes to avoid re-embedding)
+		if ps.editStripEmbeddedArt {
 			cmds = append(cmds, applyCmd{
-				fieldIdx: baseIdx + fi,
-				op:       applyOpTagWrite,
-				srcPath:  filepath.Join(baseDir, trackDir, ps.editTracksOrig[ti].File),
-				tags:     map[string]string{trackTagNames[fi]: ps.editTrackValue(ti, fi)},
+				fieldIdx: baseIdx + 1,
+				op:       applyOpStripArt,
+				srcPath:  trackPath,
 			})
 		}
+
+		// Batch write all tags for this track (if any)
+		if len(tags) > 0 {
+			cmds = append(cmds, applyCmd{
+				fieldIdx: baseIdx + 1,
+				op:       applyOpTagWrite,
+				srcPath:  trackPath,
+				tags:     tags,
+			})
+		}
+
+		// File rename (separate command, after tags)
 		if ps.editIsModified(baseIdx + 2) {
 			cmds = append(cmds, applyCmd{
-				fieldIdx: baseIdx + 2,
+				fieldIdx: baseIdx + 2, // File field (7, 10, 13, ...)
 				op:       applyOpRename,
-				srcPath:  filepath.Join(baseDir, trackDir, ps.editTracksOrig[ti].File),
+				srcPath:  trackPath,
 				dstPath:  filepath.Join(baseDir, trackDir, ps.editTracks[ti].File),
 			})
 		}
