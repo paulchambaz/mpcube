@@ -476,7 +476,7 @@ type editorFinishedMsg struct {
 
 func (ps *PlayerState) editOpenCover() {
 	coverPath := filepath.Join(ps.config.MusicDir, ps.editAlbum[3], ps.editAlbum[4])
-	c := exec.Command("xdg-open", coverPath)
+	c := exec.Command(ps.config.ImageViewer, coverPath)
 	if err := c.Start(); err != nil {
 		return
 	}
@@ -616,7 +616,7 @@ func (ps *PlayerState) coverDownloadToTemp(openAfter bool) {
 			ps.editAlbum[4] = "cover" + ext
 			ps.editCoverPending = true
 			if openAfter {
-				c := exec.Command("xdg-open", ps.editCoverPreviewPath)
+				c := exec.Command(ps.config.ImageViewer, ps.editCoverPreviewPath)
 				if err := c.Start(); err == nil {
 					go c.Wait()
 				}
@@ -638,7 +638,7 @@ func (ps *PlayerState) coverDownloadToTemp(openAfter bool) {
 	ps.editCoverPending = true
 
 	if openAfter {
-		c := exec.Command("xdg-open", ps.editCoverPreviewPath)
+		c := exec.Command(ps.config.ImageViewer, ps.editCoverPreviewPath)
 		if err := c.Start(); err == nil {
 			go c.Wait()
 		}

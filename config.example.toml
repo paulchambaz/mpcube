@@ -1,0 +1,25 @@
+# mpcube example configuration file
+# Copy this to ~/.config/mpcube/config.toml or use --config flag
+
+# MPD connection settings
+mpd_host = "127.0.0.1"
+mpd_port = 6600
+
+# Playback controls
+volume_step = 10        # Volume adjustment step
+seek_duration = 5000    # Seek duration in milliseconds
+
+# UI refresh and connection
+tick_interval = 100     # UI refresh interval in milliseconds
+max_retry_delay = 30    # Max MPD reconnect delay in seconds
+
+# UI layout
+scroll_padding = 5           # Scroll padding lines
+wide_threshold = 100         # Terminal width for wide layout
+album_width = 40             # Album panel width in wide layout
+volume_bar_threshold = 90    # Terminal width for wide volume bar
+volume_bar_width = 30        # Volume bar width in wide layout
+
+# Paths
+music_dir = "~/music"        # MPD music directory path
+image_viewer = "xdg-open"    # Image viewer for cover art (e.g., "nsxiv", "feh", "sxiv")

@@ -1,5 +1,5 @@
 run * ARGS:
-  go run . {{ ARGS }}
+  go run . --config mpcube.cfg {{ ARGS }}
 
 build:
   go build .

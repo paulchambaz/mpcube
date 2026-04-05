@@ -28,7 +28,8 @@ type Config struct {
 	VolumeBarThreshold int `toml:"volume_bar_threshold"`
 	VolumeBarWidth     int `toml:"volume_bar_width"`
 
-	MusicDir string `toml:"music_dir"`
+	MusicDir    string `toml:"music_dir"`
+	ImageViewer string `toml:"image_viewer"`
 }
 
 func DefaultConfig() Config {
@@ -44,21 +45,46 @@ func DefaultConfig() Config {
 		AlbumWidth:         40,
 		VolumeBarThreshold: 90,
 		VolumeBarWidth:     30,
+		ImageViewer:        "xdg-open",
 	}
 }
 
 func LoadConfig() (Config, error) {
 	cfg := DefaultConfig()
 
+	// Parse --config flag early to get custom config path
+	var configPath string
+	for i, arg := range os.Args {
+		if arg == "--config" && i+1 < len(os.Args) {
+			configPath = os.Args[i+1]
+			break
+		} else if arg == "-config" && i+1 < len(os.Args) {
+			configPath = os.Args[i+1]
+			break
+		}
+	}
+
 	home, err := os.UserHomeDir()
 	if err == nil && cfg.MusicDir == "" {
 		cfg.MusicDir = filepath.Join(home, "music")
 	}
-	if err == nil {
-		configPath := filepath.Join(home, ".config", "mpcube", "config.toml")
+
+	// Load config file
+	if configPath != "" {
+		// Use explicitly specified config file
 		if _, err := os.Stat(configPath); err == nil {
 			if _, err := toml.DecodeFile(configPath, &cfg); err != nil {
 				return cfg, fmt.Errorf("could not parse %s: %w", configPath, err)
+			}
+		} else {
+			return cfg, fmt.Errorf("config file not found: %s", configPath)
+		}
+	} else if err == nil {
+		// Fall back to default location
+		defaultPath := filepath.Join(home, ".config", "mpcube", "config.toml")
+		if _, err := os.Stat(defaultPath); err == nil {
+			if _, err := toml.DecodeFile(defaultPath, &cfg); err != nil {
+				return cfg, fmt.Errorf("could not parse %s: %w", defaultPath, err)
 			}
 		}
 	}
@@ -119,8 +145,13 @@ func LoadConfig() (Config, error) {
 	if v := os.Getenv("MPCUBE_MUSIC_DIR"); v != "" {
 		cfg.MusicDir = v
 	}
+	if v := os.Getenv("MPCUBE_IMAGE_VIEWER"); v != "" {
+		cfg.ImageViewer = v
+	}
 
 	var showVersion bool
+	var configFile string
+	flag.StringVar(&configFile, "config", "", "config file path")
 	flag.StringVar(&cfg.MPDHost, "mpd-host", cfg.MPDHost, "MPD host address")
 	flag.IntVar(&cfg.MPDPort, "mpd-port", cfg.MPDPort, "MPD port number")
 	flag.IntVar(&cfg.VolumeStep, "volume-step", cfg.VolumeStep, "volume adjustment step")
@@ -133,6 +164,7 @@ func LoadConfig() (Config, error) {
 	flag.IntVar(&cfg.VolumeBarThreshold, "volume-bar-threshold", cfg.VolumeBarThreshold, "terminal width for wide volume bar")
 	flag.IntVar(&cfg.VolumeBarWidth, "volume-bar-width", cfg.VolumeBarWidth, "volume bar width in wide layout")
 	flag.StringVar(&cfg.MusicDir, "music-dir", cfg.MusicDir, "MPD music directory path")
+	flag.StringVar(&cfg.ImageViewer, "image-viewer", cfg.ImageViewer, "image viewer program for cover art")
 	flag.BoolVar(&showVersion, "version", false, "print version")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: mpcube [OPTIONS]\n\nOptions:\n")
