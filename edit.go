@@ -422,14 +422,15 @@ func (ps *PlayerState) editReverseSyncFilenames() {
 	if mixed {
 		ps.editAlbum[0] = "mixed"
 		ps.editAlbum[1] = "mixed"
-		// Per-track: parse each track's own directory
+		// Per-track: parse each track's own directory (use pending Dir value)
 		for i := range ps.editTracks {
-			artist, albumName, _ := parseDirName(ps.editTracksOrig[i].Dir)
+			artist, albumName, _ := parseDirName(ps.editTracks[i].Dir)
 			ps.editTracks[i].Artist = artist
 			ps.editTracks[i].Album = albumName
 		}
 	} else {
-		artist, albumName, date := parseDirName(ps.editAlbumOrig[3])
+		// Use pending directory value instead of original
+		artist, albumName, date := parseDirName(ps.editAlbum[3])
 		if artist != "" {
 			ps.editAlbum[1] = artist
 		}
@@ -439,9 +440,9 @@ func (ps *PlayerState) editReverseSyncFilenames() {
 		}
 	}
 
-	// Parse track filenames
+	// Parse track filenames (use pending File value instead of original)
 	for i := range ps.editTracks {
-		m := trackFilenameRe.FindStringSubmatch(ps.editTracksOrig[i].File)
+		m := trackFilenameRe.FindStringSubmatch(ps.editTracks[i].File)
 		if m == nil {
 			continue
 		}
