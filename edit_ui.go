@@ -23,7 +23,7 @@ func (ps *PlayerState) renderEditView() string {
 	rightTopHeight := (ps.windowHeight - 6) / 3
 	rightMiddleHeight := rightTopHeight
 	rightBottomHeight := ps.windowHeight - 6 - rightTopHeight - rightMiddleHeight
-	rightTopPanel := ps.renderEditEmptyPanel(" Metadata ", sideWidth, rightTopHeight, ps.editFocus == EditFocusMetadata)
+	rightTopPanel := ps.renderEditMetadataPanel(sideWidth, rightTopHeight)
 	rightMiddlePanel := ps.renderEditCoverPanel(sideWidth, rightMiddleHeight)
 	rightBottomPanel := ps.renderEditEmptyPanel(" Download ", sideWidth, rightBottomHeight, ps.editFocus == EditFocusDownload)
 	rightColumn := lipgloss.JoinVertical(0.0, rightTopPanel, rightMiddlePanel, rightBottomPanel)
@@ -239,6 +239,130 @@ func (ps *PlayerState) renderEditCoverPanel(width, height int) string {
 		for i := ps.editCoverResultOffset; i < len(ps.editCoverResults) && len(lines)-2 < resultsHeight; i++ {
 			r := ps.editCoverResults[i]
 			isSelected := i == ps.editCoverResultIdx
+
+			label := " " + r.artist + " - " + r.title
+			var meta []string
+			if r.date != "" {
+				year := r.date
+				if len(year) > 4 {
+					year = year[:4]
+				}
+				meta = append(meta, year)
+			}
+			if r.country != "" {
+				meta = append(meta, r.country)
+			}
+			if r.format != "" {
+				meta = append(meta, r.format)
+			}
+			if len(meta) > 0 {
+				label += " (" + strings.Join(meta, ", ") + ")"
+			}
+			if len(label) > width {
+				label = label[:width]
+			}
+
+			style := lipgloss.NewStyle()
+			if isSelected && focused {
+				style = style.Reverse(true).Foreground(lipgloss.Color("12"))
+			} else {
+				style = style.Foreground(lipgloss.Color("8"))
+			}
+			lines = append(lines, style.Render(fmt.Sprintf("%-*s", width, label)))
+		}
+	}
+
+	return topStyle.Render(topBorder) + "\n" + contentStyle.Render(strings.Join(lines, "\n"))
+}
+
+func (ps *PlayerState) renderEditMetadataPanel(width, height int) string {
+	focused := ps.editFocus == EditFocusMetadata
+	var borderColor lipgloss.Color
+	if focused {
+		borderColor = lipgloss.Color("9")
+	} else {
+		borderColor = lipgloss.Color("8")
+	}
+
+	title := " Metadata "
+	remainingWidth := width - len(title)
+	leftPad := remainingWidth / 2
+	rightPad := remainingWidth - leftPad
+	topBorder := "┌" + strings.Repeat("─", max(0, leftPad)) + title + strings.Repeat("─", max(0, rightPad)) + "┐"
+	topStyle := lipgloss.NewStyle().Foreground(borderColor)
+	if focused {
+		topStyle = topStyle.Bold(true)
+	}
+
+	contentStyle := lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Border(lipgloss.NormalBorder()).
+		BorderTop(false).
+		BorderForeground(borderColor)
+
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+
+	var lines []string
+
+	// Search bar line
+	if ps.mode == ModeEditMetadataInput {
+		buf := ps.editInputBuf
+		pos := ps.editInputPos
+		maxW := width - len(" Search: ") - 2
+		visStart := 0
+		if pos > visStart+maxW {
+			visStart = pos - maxW
+		}
+		visEnd := min(len(buf), visStart+maxW)
+		cursorInVis := pos - visStart
+
+		before := buf[visStart : visStart+cursorInVis]
+		var cursorChar string
+		if pos < len(buf) {
+			cursorChar = string(buf[pos])
+		} else {
+			cursorChar = " "
+		}
+		after := ""
+		if pos+1 < len(buf) && pos+1 <= visEnd {
+			after = buf[pos+1 : visEnd]
+		}
+
+		cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true).Reverse(true)
+		searchLine := dimStyle.Render(" Search: "+before) + cursorStyle.Render(cursorChar) + dimStyle.Render(after)
+		lines = append(lines, searchLine)
+	} else {
+		search := ps.editMetadataSearch
+		maxSearch := width - len(" Search: ") - 1
+		if len(search) > maxSearch {
+			search = search[:maxSearch]
+		}
+		lines = append(lines, dimStyle.Render(" Search: "+search))
+	}
+
+	// Error or status line
+	if ps.editMetadataError != "" {
+		errStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+		errMsg := ps.editMetadataError
+		if len(errMsg)+1 > width {
+			errMsg = errMsg[:width-1]
+		}
+		lines = append(lines, errStyle.Render(" "+errMsg))
+	} else if ps.editMetadataPending {
+		// Show staged indicator
+		stagingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+		lines = append(lines, stagingStyle.Render(" Metadata staged"))
+	} else if len(ps.editMetadataResults) > 0 {
+		// Separator
+		sep := " " + strings.Repeat("─", max(0, width-2))
+		lines = append(lines, dimStyle.Render(sep))
+
+		// Results list
+		resultsHeight := height - len(lines)
+		for i := ps.editMetadataResultOffset; i < len(ps.editMetadataResults) && len(lines)-2 < resultsHeight; i++ {
+			r := ps.editMetadataResults[i]
+			isSelected := i == ps.editMetadataResultIdx
 
 			label := " " + r.artist + " - " + r.title
 			var meta []string

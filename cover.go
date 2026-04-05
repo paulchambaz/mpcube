@@ -21,6 +21,11 @@ type coverResult struct {
 	format       string
 }
 
+type metadataTrack struct {
+	position int
+	title    string
+}
+
 
 func searchMusicBrainz(query string) ([]coverResult, error) {
 	u := "https://musicbrainz.org/ws/2/release?query=" + strings.ReplaceAll(query, " ", "+") + "&fmt=json&limit=100"
@@ -162,4 +167,82 @@ func (ps *PlayerState) editCoverResultsHeight() int {
 
 func (ps *PlayerState) editCoverDir() string {
 	return filepath.Join(ps.config.MusicDir, ps.editAlbumOrig[3])
+}
+
+func fetchReleaseTracks(mbid string) ([]metadataTrack, error) {
+	u := "https://musicbrainz.org/ws/2/release/" + mbid + "?inc=recordings&fmt=json"
+
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "mpcube/1.0 (https://github.com/podcube/mpcube)")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("musicbrainz: %s", resp.Status)
+	}
+
+	var data struct {
+		Media []struct {
+			Tracks []struct {
+				Position  int `json:"position"`
+				Recording struct {
+					Title string `json:"title"`
+				} `json:"recording"`
+			} `json:"tracks"`
+		} `json:"media"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("musicbrainz: %w", err)
+	}
+
+	var tracks []metadataTrack
+	// Flatten all media (handle multi-disc releases)
+	for _, medium := range data.Media {
+		for _, t := range medium.Tracks {
+			tracks = append(tracks, metadataTrack{
+				position: t.Position,
+				title:    t.Recording.Title,
+			})
+		}
+	}
+
+	return tracks, nil
+}
+
+func (ps *PlayerState) doMetadataSearch(query string) {
+	results, err := searchMusicBrainz(query)
+	if err != nil {
+		ps.editMetadataError = err.Error()
+		return
+	}
+	ps.editMetadataResults = results
+	ps.editMetadataResultIdx = 0
+	ps.editMetadataResultOffset = 0
+	if len(results) == 0 {
+		ps.editMetadataError = "no results found"
+		return
+	}
+	ps.editMetadataError = ""
+}
+
+func (ps *PlayerState) metadataFixResultOffset() {
+	h := ps.editMetadataResultsHeight()
+	if h <= 0 {
+		return
+	}
+	ps.editMetadataResultOffset = clampOffset(ps.editMetadataResultOffset, ps.editMetadataResultIdx, h, min(1, h/4), len(ps.editMetadataResults))
+}
+
+func (ps *PlayerState) editMetadataResultsHeight() int {
+	rightHeight := (ps.windowHeight - 6) / 3
+	// Subtract 2 for search bar line + separator
+	return rightHeight - 2
 }

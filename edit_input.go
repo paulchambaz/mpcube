@@ -29,9 +29,10 @@ type editCenterKeyMap struct {
 	apply     key.Binding
 	applyAll  key.Binding
 	playPause key.Binding
-	search    key.Binding
-	openCover key.Binding
-	gotoCover key.Binding
+	search       key.Binding
+	openCover    key.Binding
+	gotoCover    key.Binding
+	gotoMetadata key.Binding
 }
 
 var editCenterKeys = editCenterKeyMap{
@@ -51,9 +52,10 @@ var editCenterKeys = editCenterKeyMap{
 	apply:     key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "apply field")),
 	applyAll:  key.NewBinding(key.WithKeys("U"), key.WithHelp("U", "apply all")),
 	playPause: key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "play/pause")),
-	search:    key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
-	openCover: key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open cover")),
-	gotoCover: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "cover panel")),
+	search:       key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search")),
+	openCover:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open cover")),
+	gotoCover:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "cover panel")),
+	gotoMetadata: key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "metadata panel")),
 }
 
 func (k editCenterKeyMap) bindings() []helpEntry {
@@ -199,6 +201,8 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editOpenCover()
 	case key.Matches(msg, editCenterKeys.gotoCover):
 		ps.editFocus = EditFocusCover
+	case key.Matches(msg, editCenterKeys.gotoMetadata):
+		ps.editFocus = EditFocusMetadata
 	case msg.String() == "J":
 		if ps.albumSelected < len(ps.musicData.Albums)-1 {
 			ps.albumSelected++
@@ -262,6 +266,8 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editOpenCover()
 	case key.Matches(msg, editCenterKeys.gotoCover):
 		ps.editFocus = EditFocusCover
+	case key.Matches(msg, editCenterKeys.gotoMetadata):
+		ps.editFocus = EditFocusMetadata
 	}
 	return ps, nil
 }
@@ -312,6 +318,8 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editOpenCover()
 	case key.Matches(msg, editCenterKeys.gotoCover):
 		ps.editFocus = EditFocusCover
+	case key.Matches(msg, editCenterKeys.gotoMetadata):
+		ps.editFocus = EditFocusMetadata
 	}
 	return ps, nil
 }
@@ -319,13 +327,34 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (ps *PlayerState) handleEditRight(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, editCenterKeys.quit):
+		if ps.editFocus == EditFocusMetadata && len(ps.editMetadataResults) > 0 {
+			// Clear results instead of exiting
+			ps.editMetadataResults = nil
+			ps.editMetadataResultIdx = 0
+			ps.editMetadataResultOffset = 0
+			return ps, nil
+		}
 		ps.exitEditMode()
 		return ps, nil
 	case key.Matches(msg, editCenterKeys.left):
 		ps.editFocus = EditFocusCenter
+		return ps, nil
 	case key.Matches(msg, editCenterKeys.search):
 		ps.editEnterSearch()
+		return ps, nil
+	case key.Matches(msg, editCenterKeys.gotoCover):
+		ps.editFocus = EditFocusCover
+		return ps, nil
+	case key.Matches(msg, editCenterKeys.gotoMetadata):
+		ps.editFocus = EditFocusMetadata
+		return ps, nil
 	}
+
+	// Metadata panel specific handling
+	if ps.editFocus == EditFocusMetadata {
+		return ps.handleEditMetadata(msg)
+	}
+
 	return ps, nil
 }
 
@@ -601,6 +630,10 @@ func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			_ = ps.update()
 			ps.editLoadAlbum()
 		}
+	case key.Matches(msg, editCenterKeys.gotoCover):
+		ps.editFocus = EditFocusCover
+	case key.Matches(msg, editCenterKeys.gotoMetadata):
+		ps.editFocus = EditFocusMetadata
 	}
 	return ps, nil
 }
@@ -617,6 +650,87 @@ func (ps *PlayerState) handleEditCoverInput(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		ps.editInputPos = 0
 		ps.mode = ModeEdit
 		ps.doCoverSearch(ps.editCoverSearch)
+	default:
+		ps.handleTextInput(msg)
+	}
+	return ps, nil
+}
+
+func (ps *PlayerState) handleEditMetadata(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if ps.editMetadataError != "" {
+		ps.editMetadataError = ""
+		return ps, nil
+	}
+
+	hasResults := len(ps.editMetadataResults) > 0
+
+	switch {
+	case msg.String() == "i":
+		// Enter search input mode
+		ps.editInputBuf = ps.editMetadataSearch
+		ps.editInputPos = len(ps.editInputBuf)
+		ps.editMetadataError = ""
+		ps.mode = ModeEditMetadataInput
+
+	case msg.String() == "enter":
+		if hasResults {
+			// Stage metadata from selected result
+			ps.stageMetadataFromMusicBrainz()
+		} else {
+			// Perform search
+			ps.doMetadataSearch(ps.editMetadataSearch)
+		}
+
+	case msg.String() == "j" || msg.String() == "down":
+		if hasResults && ps.editMetadataResultIdx < len(ps.editMetadataResults)-1 {
+			ps.editMetadataResultIdx++
+			ps.metadataFixResultOffset()
+		}
+
+	case msg.String() == "k" || msg.String() == "up":
+		if hasResults && ps.editMetadataResultIdx > 0 {
+			ps.editMetadataResultIdx--
+			ps.metadataFixResultOffset()
+		}
+
+	case msg.String() == "g" || msg.String() == "home":
+		if hasResults {
+			ps.editMetadataResultIdx = 0
+			ps.editMetadataResultOffset = 0
+		}
+
+	case msg.String() == "G" || msg.String() == "end":
+		if hasResults {
+			ps.editMetadataResultIdx = max(0, len(ps.editMetadataResults)-1)
+			ps.metadataFixResultOffset()
+		}
+
+	case msg.String() == "U":
+		// Apply all changes
+		cmds := ps.editBuildApplyAll()
+		if len(cmds) > 0 {
+			ps.editStartApply(cmds)
+		} else {
+			_ = ps.update()
+			ps.editLoadAlbum()
+		}
+	}
+
+	return ps, nil
+}
+
+func (ps *PlayerState) handleEditMetadataInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEscape:
+		ps.editInputBuf = ""
+		ps.editInputPos = 0
+		ps.mode = ModeEdit
+	case tea.KeyEnter:
+		ps.editMetadataSearch = ps.editInputBuf
+		ps.editInputBuf = ""
+		ps.editInputPos = 0
+		ps.mode = ModeEdit
+		ps.doMetadataSearch(ps.editMetadataSearch)
 	default:
 		ps.handleTextInput(msg)
 	}

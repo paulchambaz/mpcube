@@ -94,6 +94,7 @@ func (ps *PlayerState) editLoadAlbumData() {
 		ps.editHasEmbeddedArt = false
 	}
 	ps.editCoverSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
+	ps.editMetadataSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
 
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
@@ -143,6 +144,12 @@ func (ps *PlayerState) exitEditMode() {
 		ps.editCoverPreviewMBID = ""
 		ps.editCoverPreviewResultIdx = 0
 	}
+	ps.editMetadataSearch = ""
+	ps.editMetadataResults = nil
+	ps.editMetadataResultIdx = 0
+	ps.editMetadataResultOffset = 0
+	ps.editMetadataError = ""
+	ps.editMetadataPending = false
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
 	ps.editTitleIdx = 0
@@ -276,6 +283,10 @@ func (ps *PlayerState) editLoadAlbum() {
 	ps.editCoverResults = nil
 	ps.editCoverResultIdx = 0
 	ps.editCoverResultOffset = 0
+	ps.editMetadataResults = nil
+	ps.editMetadataResultIdx = 0
+	ps.editMetadataResultOffset = 0
+	ps.editMetadataPending = false
 }
 
 func (ps *PlayerState) editRevertField() {
@@ -313,6 +324,7 @@ func (ps *PlayerState) editRevertAll() {
 	ps.editAlbum = ps.editAlbumOrig
 	ps.editStripEmbeddedArt = false
 	ps.editCoverPending = false
+	ps.editMetadataPending = false
 	for i := range ps.editTracks {
 		ps.editTracks[i] = ps.editTracksOrig[i]
 	}
@@ -948,6 +960,56 @@ func (ps *PlayerState) finishApply() tea.Model {
 	ps.editLoadAlbum()
 
 	return ps
+}
+
+func (ps *PlayerState) stageMetadataFromMusicBrainz() {
+	if len(ps.editMetadataResults) == 0 {
+		return
+	}
+
+	selected := ps.editMetadataResults[ps.editMetadataResultIdx]
+
+	// Fetch full tracklist
+	tracks, err := fetchReleaseTracks(selected.mbid)
+	if err != nil {
+		ps.editMetadataError = err.Error()
+		return
+	}
+
+	// Stage album-level metadata
+	ps.editAlbum[0] = selected.title  // Album
+	ps.editAlbum[1] = selected.artist // Artist
+
+	// Parse date (MB returns YYYY-MM-DD or YYYY, we want YYYY)
+	if len(selected.date) >= 4 {
+		ps.editAlbum[2] = selected.date[:4]
+	} else {
+		ps.editAlbum[2] = selected.date
+	}
+
+	// Match tracks by track number
+	for i := range ps.editTracks {
+		// Parse current track number (handle "01", "1", etc.)
+		trackNumStr := strings.TrimSpace(ps.editTracks[i].Track)
+		trackNum, err := strconv.Atoi(trackNumStr)
+		if err != nil {
+			continue // Skip non-numeric track numbers
+		}
+
+		// Find matching MB track by position
+		for _, mbTrack := range tracks {
+			if mbTrack.position == trackNum {
+				// Update track metadata
+				ps.editTracks[i].Track = strconv.Itoa(mbTrack.position)
+				ps.editTracks[i].Title = mbTrack.title
+				break
+			}
+		}
+	}
+
+	// Set pending flag to show metadata is staged
+	ps.editMetadataPending = true
+	ps.editMetadataError = ""
 }
 
 // updateAndWait triggers an MPD database update and waits synchronously for it to complete.

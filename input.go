@@ -53,7 +53,7 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps, nil
 	}
 
-	if ps.mode != ModeSearch && ps.mode != ModeEditInput && ps.mode != ModeEditSearch && ps.mode != ModeEditCoverInput {
+	if ps.mode != ModeSearch && ps.mode != ModeEditInput && ps.mode != ModeEditSearch && ps.mode != ModeEditCoverInput && ps.mode != ModeEditMetadataInput {
 		switch {
 		case key.Matches(msg, globalKeys.seekForward):
 			_ = ps.seekForward()
@@ -89,6 +89,8 @@ func (ps *PlayerState) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps.handleEditSearching(msg)
 	case ModeEditCoverInput:
 		return ps.handleEditCoverInput(msg)
+	case ModeEditMetadataInput:
+		return ps.handleEditMetadataInput(msg)
 	case ModeEditApply:
 		// Block all input during apply - commands are processed by tick handler
 		return ps, nil

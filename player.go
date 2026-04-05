@@ -21,6 +21,7 @@ const (
 	ModeEditSearch
 	ModeEditSearching
 	ModeEditCoverInput
+	ModeEditMetadataInput
 	ModeEditApply
 )
 
@@ -81,7 +82,13 @@ type PlayerState struct {
 	editCoverPreviewPath      string
 	editCoverPreviewMBID      string
 	editCoverPreviewResultIdx int
-	editCoverPending bool
+	editCoverPending          bool
+	editMetadataSearch        string
+	editMetadataResults       []coverResult
+	editMetadataResultIdx     int
+	editMetadataResultOffset  int
+	editMetadataError         string
+	editMetadataPending       bool
 	editInputBuf       string
 	editInputPos       int
 
