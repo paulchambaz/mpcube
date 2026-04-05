@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -83,12 +85,15 @@ type PlayerState struct {
 	editCoverPreviewMBID      string
 	editCoverPreviewResultIdx int
 	editCoverPending          bool
+	editCoverSearching        bool
+	editCoverDownloading      bool
 	editMetadataSearch        string
 	editMetadataResults       []coverResult
 	editMetadataResultIdx     int
 	editMetadataResultOffset  int
 	editMetadataError         string
 	editMetadataPending       bool
+	editMetadataSearching     bool
 	editInputBuf       string
 	editInputPos       int
 
@@ -200,6 +205,98 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case editorFinishedMsg:
 		ps.handleEditorFinished(msg)
+		return ps, nil
+
+	case metadataSearchResultMsg:
+		ps.editMetadataSearching = false
+		if msg.err != nil {
+			ps.editMetadataError = msg.err.Error()
+		} else {
+			ps.editMetadataResults = msg.results
+			ps.editMetadataResultIdx = 0
+			ps.editMetadataResultOffset = 0
+			if len(msg.results) == 0 {
+				ps.editMetadataError = "no results found"
+			} else {
+				ps.editMetadataError = ""
+			}
+		}
+		return ps, nil
+
+	case metadataFetchResultMsg:
+		ps.editMetadataSearching = false
+		if msg.err != nil {
+			ps.editMetadataError = msg.err.Error()
+			return ps, nil
+		}
+		// Ignore if results were cleared (e.g., user exited editor during fetch)
+		if len(ps.editMetadataResults) == 0 || ps.editMetadataResultIdx >= len(ps.editMetadataResults) {
+			return ps, nil
+		}
+		// Stage the fetched metadata
+		selected := ps.editMetadataResults[ps.editMetadataResultIdx]
+		ps.editAlbum[0] = selected.title
+		ps.editAlbum[1] = selected.artist
+		if len(selected.date) >= 4 {
+			ps.editAlbum[2] = selected.date[:4]
+		} else {
+			ps.editAlbum[2] = selected.date
+		}
+		// Match tracks by track number
+		for i := range ps.editTracks {
+			trackNumStr := strings.TrimSpace(ps.editTracks[i].Track)
+			trackNum, err := strconv.Atoi(trackNumStr)
+			if err != nil {
+				continue
+			}
+			for _, mbTrack := range msg.tracks {
+				if mbTrack.position == trackNum {
+					ps.editTracks[i].Track = strconv.Itoa(mbTrack.position)
+					ps.editTracks[i].Title = mbTrack.title
+					break
+				}
+			}
+		}
+		ps.editMetadataPending = true
+		ps.editMetadataError = ""
+		return ps, nil
+
+	case coverSearchResultMsg:
+		ps.editCoverSearching = false
+		if msg.err != nil {
+			ps.editCoverError = msg.err.Error()
+		} else {
+			ps.editCoverResults = msg.results
+			ps.editCoverResultIdx = 0
+			ps.editCoverResultOffset = 0
+			if len(msg.results) == 0 {
+				ps.editCoverError = "no covers found"
+			} else {
+				ps.editCoverError = ""
+			}
+		}
+		return ps, nil
+
+	case coverDownloadResultMsg:
+		ps.editCoverDownloading = false
+		if msg.err != nil {
+			ps.editCoverError = msg.err.Error()
+			return ps, nil
+		}
+		// Ignore if results were cleared (e.g., user exited editor during download)
+		if len(ps.editCoverResults) == 0 || ps.editCoverResultIdx >= len(ps.editCoverResults) {
+			return ps, nil
+		}
+		// Update preview path
+		ps.editCoverPreviewPath = msg.path + msg.ext
+		ps.editCoverPreviewMBID = ps.editCoverResults[ps.editCoverResultIdx].releaseGroup
+		ps.editCoverPreviewResultIdx = ps.editCoverResultIdx
+		ps.editAlbum[4] = "cover" + msg.ext
+		// Only stage if requested (enter key, not 'o' key)
+		if msg.stageForInstall {
+			ps.editCoverPending = true
+		}
+		ps.editCoverError = ""
 		return ps, nil
 
 	case tea.KeyMsg:

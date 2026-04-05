@@ -138,6 +138,8 @@ func (ps *PlayerState) exitEditMode() {
 	ps.editCoverResultOffset = 0
 	ps.editCoverError = ""
 	ps.editCoverPending = false
+	ps.editCoverSearching = false
+	ps.editCoverDownloading = false
 	if ps.editCoverPreviewPath != "" {
 		os.Remove(ps.editCoverPreviewPath)
 		ps.editCoverPreviewPath = ""
@@ -150,6 +152,7 @@ func (ps *PlayerState) exitEditMode() {
 	ps.editMetadataResultOffset = 0
 	ps.editMetadataError = ""
 	ps.editMetadataPending = false
+	ps.editMetadataSearching = false
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
 	ps.editTitleIdx = 0
@@ -283,10 +286,13 @@ func (ps *PlayerState) editLoadAlbum() {
 	ps.editCoverResults = nil
 	ps.editCoverResultIdx = 0
 	ps.editCoverResultOffset = 0
+	ps.editCoverSearching = false
+	ps.editCoverDownloading = false
 	ps.editMetadataResults = nil
 	ps.editMetadataResultIdx = 0
 	ps.editMetadataResultOffset = 0
 	ps.editMetadataPending = false
+	ps.editMetadataSearching = false
 }
 
 func (ps *PlayerState) editRevertField() {

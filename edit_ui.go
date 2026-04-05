@@ -213,12 +213,20 @@ func (ps *PlayerState) renderEditCoverPanel(width, height int) string {
 		searchLine := dimStyle.Render(" Search: "+before) + cursorStyle.Render(cursorChar) + dimStyle.Render(after)
 		lines = append(lines, searchLine)
 	} else {
-		search := ps.editCoverSearch
-		maxSearch := width - len(" Search: ") - 1
-		if len(search) > maxSearch {
-			search = search[:maxSearch]
+		if ps.editCoverSearching {
+			searchingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+			lines = append(lines, searchingStyle.Render(" Searching..."))
+		} else if ps.editCoverDownloading {
+			downloadingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+			lines = append(lines, downloadingStyle.Render(" Downloading..."))
+		} else {
+			search := ps.editCoverSearch
+			maxSearch := width - len(" Search: ") - 1
+			if len(search) > maxSearch {
+				search = search[:maxSearch]
+			}
+			lines = append(lines, dimStyle.Render(" Search: "+search))
 		}
-		lines = append(lines, dimStyle.Render(" Search: "+search))
 	}
 
 	// Error line
@@ -333,12 +341,17 @@ func (ps *PlayerState) renderEditMetadataPanel(width, height int) string {
 		searchLine := dimStyle.Render(" Search: "+before) + cursorStyle.Render(cursorChar) + dimStyle.Render(after)
 		lines = append(lines, searchLine)
 	} else {
-		search := ps.editMetadataSearch
-		maxSearch := width - len(" Search: ") - 1
-		if len(search) > maxSearch {
-			search = search[:maxSearch]
+		if ps.editMetadataSearching {
+			searchingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+			lines = append(lines, searchingStyle.Render(" Searching..."))
+		} else {
+			search := ps.editMetadataSearch
+			maxSearch := width - len(" Search: ") - 1
+			if len(search) > maxSearch {
+				search = search[:maxSearch]
+			}
+			lines = append(lines, dimStyle.Render(" Search: "+search))
 		}
-		lines = append(lines, dimStyle.Render(" Search: "+search))
 	}
 
 	// Error or status line

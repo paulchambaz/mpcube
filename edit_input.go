@@ -33,6 +33,10 @@ type editCenterKeyMap struct {
 	openCover    key.Binding
 	gotoCover    key.Binding
 	gotoMetadata key.Binding
+	gotoDownload key.Binding
+	gotoTitles   key.Binding
+	gotoAlbums   key.Binding
+	gotoEdit     key.Binding
 }
 
 var editCenterKeys = editCenterKeyMap{
@@ -56,6 +60,10 @@ var editCenterKeys = editCenterKeyMap{
 	openCover:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open cover")),
 	gotoCover:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "cover panel")),
 	gotoMetadata: key.NewBinding(key.WithKeys("m"), key.WithHelp("m", "metadata panel")),
+	gotoDownload: key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "download panel")),
+	gotoTitles:   key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "titles panel")),
+	gotoAlbums:   key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "albums panel")),
+	gotoEdit:     key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "edit panel")),
 }
 
 func (k editCenterKeyMap) bindings() []helpEntry {
@@ -203,6 +211,14 @@ func (ps *PlayerState) handleEditCenter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editFocus = EditFocusCover
 	case key.Matches(msg, editCenterKeys.gotoMetadata):
 		ps.editFocus = EditFocusMetadata
+	case key.Matches(msg, editCenterKeys.gotoDownload):
+		ps.editFocus = EditFocusDownload
+	case key.Matches(msg, editCenterKeys.gotoTitles):
+		ps.editFocus = EditFocusTitles
+	case key.Matches(msg, editCenterKeys.gotoAlbums):
+		ps.editFocus = EditFocusAlbums
+	case key.Matches(msg, editCenterKeys.gotoEdit):
+		ps.editFocus = EditFocusCenter
 	case msg.String() == "J":
 		if ps.albumSelected < len(ps.musicData.Albums)-1 {
 			ps.albumSelected++
@@ -268,6 +284,14 @@ func (ps *PlayerState) handleEditAlbums(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editFocus = EditFocusCover
 	case key.Matches(msg, editCenterKeys.gotoMetadata):
 		ps.editFocus = EditFocusMetadata
+	case key.Matches(msg, editCenterKeys.gotoDownload):
+		ps.editFocus = EditFocusDownload
+	case key.Matches(msg, editCenterKeys.gotoTitles):
+		ps.editFocus = EditFocusTitles
+	case key.Matches(msg, editCenterKeys.gotoAlbums):
+		ps.editFocus = EditFocusAlbums
+	case key.Matches(msg, editCenterKeys.gotoEdit):
+		ps.editFocus = EditFocusCenter
 	}
 	return ps, nil
 }
@@ -320,6 +344,14 @@ func (ps *PlayerState) handleEditTitles(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editFocus = EditFocusCover
 	case key.Matches(msg, editCenterKeys.gotoMetadata):
 		ps.editFocus = EditFocusMetadata
+	case key.Matches(msg, editCenterKeys.gotoDownload):
+		ps.editFocus = EditFocusDownload
+	case key.Matches(msg, editCenterKeys.gotoTitles):
+		ps.editFocus = EditFocusTitles
+	case key.Matches(msg, editCenterKeys.gotoAlbums):
+		ps.editFocus = EditFocusAlbums
+	case key.Matches(msg, editCenterKeys.gotoEdit):
+		ps.editFocus = EditFocusCenter
 	}
 	return ps, nil
 }
@@ -347,6 +379,18 @@ func (ps *PlayerState) handleEditRight(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return ps, nil
 	case key.Matches(msg, editCenterKeys.gotoMetadata):
 		ps.editFocus = EditFocusMetadata
+		return ps, nil
+	case key.Matches(msg, editCenterKeys.gotoDownload):
+		ps.editFocus = EditFocusDownload
+		return ps, nil
+	case key.Matches(msg, editCenterKeys.gotoTitles):
+		ps.editFocus = EditFocusTitles
+		return ps, nil
+	case key.Matches(msg, editCenterKeys.gotoAlbums):
+		ps.editFocus = EditFocusAlbums
+		return ps, nil
+	case key.Matches(msg, editCenterKeys.gotoEdit):
+		ps.editFocus = EditFocusCenter
 		return ps, nil
 	}
 
@@ -592,9 +636,32 @@ func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.mode = ModeEditCoverInput
 	case msg.String() == "enter":
 		if hasResults {
-			ps.coverDownloadToTemp(true)
+			// Stage cover from selected result
+			// Check if already downloaded for this result
+			if ps.editCoverPreviewResultIdx == ps.editCoverResultIdx && ps.editCoverPreviewPath != "" {
+				if _, err := os.Stat(ps.editCoverPreviewPath); err == nil {
+					// Reuse existing download
+					ext := filepath.Ext(ps.editCoverPreviewPath)
+					ps.editAlbum[4] = "cover" + ext
+					ps.editCoverPending = true
+					return ps, nil
+				}
+			}
+			selected := ps.editCoverResults[ps.editCoverResultIdx]
+			ps.editCoverDownloading = true
+			return ps, func() tea.Msg {
+				tmpPath := filepath.Join(os.TempDir(), "mpcube-cover-"+selected.releaseGroup)
+				ext, err := downloadCoverArt(selected.releaseGroup, tmpPath)
+				return coverDownloadResultMsg{path: tmpPath, ext: ext, err: err, stageForInstall: true}
+			}
 		} else {
-			ps.doCoverSearch(ps.editCoverSearch)
+			// Perform search
+			query := ps.editCoverSearch
+			ps.editCoverSearching = true
+			return ps, func() tea.Msg {
+				results, err := searchMusicBrainz(query)
+				return coverSearchResultMsg{results: results, err: err}
+			}
 		}
 	case key.Matches(msg, editCenterKeys.search):
 		ps.editEnterSearch()
@@ -620,7 +687,33 @@ func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, editCenterKeys.openCover):
 		if hasResults {
-			ps.coverDownloadToTemp(false)
+			// Download and open cover (preview only, don't stage)
+			// Check if already downloaded for this result
+			if ps.editCoverPreviewResultIdx == ps.editCoverResultIdx && ps.editCoverPreviewPath != "" {
+				if _, err := os.Stat(ps.editCoverPreviewPath); err == nil {
+					// Reuse existing download - just open it
+					c := exec.Command(ps.config.ImageViewer, ps.editCoverPreviewPath)
+					if err := c.Start(); err == nil {
+						go c.Wait()
+					}
+					return ps, nil
+				}
+			}
+			selected := ps.editCoverResults[ps.editCoverResultIdx]
+			ps.editCoverDownloading = true
+			imageViewer := ps.config.ImageViewer
+			return ps, func() tea.Msg {
+				tmpPath := filepath.Join(os.TempDir(), "mpcube-cover-"+selected.releaseGroup)
+				ext, err := downloadCoverArt(selected.releaseGroup, tmpPath)
+				if err == nil {
+					// Open in viewer
+					c := exec.Command(imageViewer, tmpPath+ext)
+					if err := c.Start(); err == nil {
+						go c.Wait()
+					}
+				}
+				return coverDownloadResultMsg{path: tmpPath, ext: ext, err: err, stageForInstall: false}
+			}
 		}
 	case msg.String() == "U":
 		cmds := ps.editBuildApplyAll()
@@ -634,6 +727,14 @@ func (ps *PlayerState) handleEditCover(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps.editFocus = EditFocusCover
 	case key.Matches(msg, editCenterKeys.gotoMetadata):
 		ps.editFocus = EditFocusMetadata
+	case key.Matches(msg, editCenterKeys.gotoDownload):
+		ps.editFocus = EditFocusDownload
+	case key.Matches(msg, editCenterKeys.gotoTitles):
+		ps.editFocus = EditFocusTitles
+	case key.Matches(msg, editCenterKeys.gotoAlbums):
+		ps.editFocus = EditFocusAlbums
+	case key.Matches(msg, editCenterKeys.gotoEdit):
+		ps.editFocus = EditFocusCenter
 	}
 	return ps, nil
 }
@@ -674,11 +775,21 @@ func (ps *PlayerState) handleEditMetadata(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case msg.String() == "enter":
 		if hasResults {
-			// Stage metadata from selected result
-			ps.stageMetadataFromMusicBrainz()
+			// Fetch tracks from selected result
+			selected := ps.editMetadataResults[ps.editMetadataResultIdx]
+			ps.editMetadataSearching = true
+			return ps, func() tea.Msg {
+				tracks, err := fetchReleaseTracks(selected.mbid)
+				return metadataFetchResultMsg{tracks: tracks, err: err}
+			}
 		} else {
 			// Perform search
-			ps.doMetadataSearch(ps.editMetadataSearch)
+			query := ps.editMetadataSearch
+			ps.editMetadataSearching = true
+			return ps, func() tea.Msg {
+				results, err := searchMusicBrainz(query)
+				return metadataSearchResultMsg{results: results, err: err}
+			}
 		}
 
 	case msg.String() == "j" || msg.String() == "down":
@@ -714,6 +825,18 @@ func (ps *PlayerState) handleEditMetadata(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			_ = ps.update()
 			ps.editLoadAlbum()
 		}
+	case key.Matches(msg, editCenterKeys.gotoCover):
+		ps.editFocus = EditFocusCover
+	case key.Matches(msg, editCenterKeys.gotoMetadata):
+		ps.editFocus = EditFocusMetadata
+	case key.Matches(msg, editCenterKeys.gotoDownload):
+		ps.editFocus = EditFocusDownload
+	case key.Matches(msg, editCenterKeys.gotoTitles):
+		ps.editFocus = EditFocusTitles
+	case key.Matches(msg, editCenterKeys.gotoAlbums):
+		ps.editFocus = EditFocusAlbums
+	case key.Matches(msg, editCenterKeys.gotoEdit):
+		ps.editFocus = EditFocusCenter
 	}
 
 	return ps, nil

@@ -26,6 +26,28 @@ type metadataTrack struct {
 	title    string
 }
 
+type metadataSearchResultMsg struct {
+	results []coverResult
+	err     error
+}
+
+type metadataFetchResultMsg struct {
+	tracks []metadataTrack
+	err    error
+}
+
+type coverSearchResultMsg struct {
+	results []coverResult
+	err     error
+}
+
+type coverDownloadResultMsg struct {
+	path            string
+	ext             string
+	err             error
+	stageForInstall bool
+}
+
 
 func searchMusicBrainz(query string) ([]coverResult, error) {
 	u := "https://musicbrainz.org/ws/2/release?query=" + strings.ReplaceAll(query, " ", "+") + "&fmt=json&limit=100"
