@@ -184,6 +184,11 @@ func (ps *PlayerState) handleNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, normalKeys.search):
 		ps.enterSearch()
 	case key.Matches(msg, normalKeys.edit):
+		if ps.albumSelected < len(ps.musicData.Albums) {
+			selectedAlbum := ps.musicData.Albums[ps.albumSelected]
+			debugLog("[KEY E] User pressed E on Album=%q Artist=%q Index=%d\n",
+				selectedAlbum.Album, selectedAlbum.Artist, ps.albumSelected)
+		}
 		ps.enterEditMode()
 	}
 	return ps, nil
@@ -276,7 +281,9 @@ func (ps *PlayerState) moveUp() {
 
 	if ps.onAlbum {
 		if ps.albumSelected > 0 {
+			oldIdx := ps.albumSelected
 			ps.albumSelected--
+			debugLog("[NAV] Up: %d→%d Album=%q\n", oldIdx, ps.albumSelected, albums[ps.albumSelected].Album)
 		}
 
 		if ps.albumSelected < ps.albumOffset+padding && ps.albumOffset > 0 {
@@ -304,7 +311,9 @@ func (ps *PlayerState) moveDown() {
 
 	if ps.onAlbum {
 		if ps.albumSelected < len(albums)-1 {
+			oldIdx := ps.albumSelected
 			ps.albumSelected++
+			debugLog("[NAV] Down: %d→%d Album=%q\n", oldIdx, ps.albumSelected, albums[ps.albumSelected].Album)
 
 			if ps.albumSelected > ps.albumOffset+ps.windowHeight-5-padding && ps.albumOffset < len(albums)-ps.windowHeight+4 {
 				ps.albumOffset++

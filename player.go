@@ -97,6 +97,11 @@ type PlayerState struct {
 	editInputBuf       string
 	editInputPos       int
 
+	editingUUID              string
+	editingOriginalTrackURIs []string
+	editingOriginalDir       string
+	editingCurrentDir        string
+
 	applyError       string
 	applyQueue       []applyCmd
 	applyProgress    int
@@ -212,7 +217,8 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			ps.editMetadataError = msg.err.Error()
 		} else {
-			ps.editMetadataResults = msg.results
+			sorted := sortCoverResultsByScore(msg.results, ps.editMetadataSearch)
+			ps.editMetadataResults = sorted
 			ps.editMetadataResultIdx = 0
 			ps.editMetadataResultOffset = 0
 			if len(msg.results) == 0 {
@@ -266,7 +272,8 @@ func (ps *PlayerState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			ps.editCoverError = msg.err.Error()
 		} else {
-			ps.editCoverResults = msg.results
+			sorted := sortCoverResultsByScore(msg.results, ps.editCoverSearch)
+			ps.editCoverResults = sorted
 			ps.editCoverResultIdx = 0
 			ps.editCoverResultOffset = 0
 			if len(msg.results) == 0 {

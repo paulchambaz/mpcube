@@ -11,6 +11,7 @@ type Album struct {
 	Album  string
 	Date   int
 	Songs  []Song
+	uuid   string
 }
 
 type Song struct {

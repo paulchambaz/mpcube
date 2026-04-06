@@ -93,20 +93,36 @@ func (ps *PlayerState) editLoadAlbumData() {
 	} else {
 		ps.editHasEmbeddedArt = false
 	}
-	ps.editCoverSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
-	ps.editMetadataSearch = ps.editAlbum[0] + " " + ps.editAlbum[1]
+	ps.editCoverSearch = ps.editAlbum[1] + " " + ps.editAlbum[0]
+	ps.editMetadataSearch = ps.editAlbum[1] + " " + ps.editAlbum[0]
 
 	ps.editFieldIdx = 0
 	ps.editFieldOffset = 0
 	ps.editTitleIdx = 0
 	ps.editTitleOffset = 0
+
+	// Update UUID tracking for the newly loaded album
+	ps.editingUUID = album.uuid
+	ps.editingOriginalTrackURIs = make([]string, len(album.Songs))
+	for i, song := range album.Songs {
+		ps.editingOriginalTrackURIs[i] = song.URI
+	}
+	ps.editingOriginalDir = ps.editAlbum[3]
+	ps.editingCurrentDir = ps.editAlbum[3]
+
+	debugLog("[LOAD] Album=%q Artist=%q Index=%d UUID=%s Tracks=%d\n",
+		album.Album, album.Artist, ps.albumSelected, ps.editingUUID[:8], len(album.Songs))
 }
 
 func (ps *PlayerState) enterEditMode() {
 	if len(ps.musicData.Albums) == 0 {
 		return
 	}
+
 	ps.editLoadAlbumData()
+
+	debugLog("[ENTER] Entered edit mode\n")
+
 	ps.editStripEmbeddedArt = false
 	ps.editCoverPending = false
 	ps.editCoverResults = nil
@@ -159,8 +175,150 @@ func (ps *PlayerState) exitEditMode() {
 	ps.editTitleOffset = 0
 	ps.editInputBuf = ""
 	ps.editInputPos = 0
+	ps.editingUUID = ""
+	ps.editingOriginalTrackURIs = nil
+	ps.editingOriginalDir = ""
+	ps.editingCurrentDir = ""
 	ps.mode = ModeNormal
 	_ = ps.update()
+}
+
+func debugLog(format string, args ...interface{}) {
+	f, err := os.OpenFile("/tmp/mpcube-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, format, args...)
+}
+
+func (ps *PlayerState) matchAndReassignUUIDs(oldData *MusicData) {
+	if oldData == nil {
+		return
+	}
+
+	newData := ps.musicData
+
+	oldByUUID := make(map[string]*Album)
+	oldUUIDByKey := make(map[string]string)
+
+	for i := range oldData.Albums {
+		album := &oldData.Albums[i]
+		oldByUUID[album.uuid] = album
+		key := fmt.Sprintf("%s|||%s|||%d", album.Artist, album.Album, album.Date)
+		oldUUIDByKey[key] = album.uuid
+	}
+
+	for i := range newData.Albums {
+		newAlbum := &newData.Albums[i]
+		key := fmt.Sprintf("%s|||%s|||%d", newAlbum.Artist, newAlbum.Album, newAlbum.Date)
+
+		if oldUUID, exists := oldUUIDByKey[key]; exists {
+			newAlbum.uuid = oldUUID
+		}
+	}
+
+	if ps.editingUUID == "" {
+		debugLog("[MATCH] editingUUID is EMPTY, Pass 2 skipped\n")
+		return
+	}
+
+	originalTrackURIs := make(map[string]bool)
+	for _, origURI := range ps.editingOriginalTrackURIs {
+		originalTrackURIs[origURI] = true
+
+		if ps.editingCurrentDir != ps.editingOriginalDir {
+			adjustedURI := adjustURIForDirRename(
+				origURI,
+				ps.editingOriginalDir,
+				ps.editingCurrentDir,
+			)
+			originalTrackURIs[adjustedURI] = true
+		}
+	}
+
+	for i := range newData.Albums {
+		newAlbum := &newData.Albums[i]
+
+		matchCount := 0
+		for _, song := range newAlbum.Songs {
+			if originalTrackURIs[song.URI] {
+				matchCount++
+			}
+		}
+
+		if matchCount > 0 {
+			newAlbum.uuid = ps.editingUUID
+		}
+	}
+}
+
+func adjustURIForDirRename(uri, oldDir, newDir string) string {
+	if oldDir == newDir {
+		return uri
+	}
+
+	oldPrefix := oldDir + "/"
+	newPrefix := newDir + "/"
+
+	if strings.HasPrefix(uri, oldPrefix) {
+		return strings.Replace(uri, oldPrefix, newPrefix, 1)
+	}
+
+	return uri
+}
+
+func (ps *PlayerState) editFindAndLoadAlbumByUUID() {
+	if ps.editingUUID == "" {
+		debugLog("[SEARCH] editingUUID is EMPTY, not loading\n")
+		return
+	}
+
+	var candidates []int
+	for i, album := range ps.musicData.Albums {
+		if album.uuid == ps.editingUUID {
+			candidates = append(candidates, i)
+		}
+	}
+
+	debugLog("[SEARCH] Found %d candidates for UUID %s\n", len(candidates), ps.editingUUID[:8])
+
+	if len(candidates) == 0 {
+		debugLog("[SEARCH] FALLBACK to stale index %d → loaded %q\n",
+			ps.albumSelected,
+			ps.musicData.Albums[ps.albumSelected].Artist+" - "+ps.musicData.Albums[ps.albumSelected].Album)
+		if ps.albumSelected >= len(ps.musicData.Albums) {
+			ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
+		}
+		ps.editLoadAlbumData()
+		return
+	}
+
+	if len(candidates) == 1 {
+		ps.albumSelected = candidates[0]
+		ps.editLoadAlbumData()
+		loadedAlbum := ps.musicData.Albums[ps.albumSelected]
+		debugLog("[LOADED] Album=%q Artist=%q Index=%d UUID=%s Tracks=%d\n",
+			loadedAlbum.Album, loadedAlbum.Artist, ps.albumSelected, loadedAlbum.uuid[:8], len(loadedAlbum.Songs))
+		return
+	}
+
+	bestIdx := candidates[0]
+	bestCount := len(ps.musicData.Albums[bestIdx].Songs)
+
+	for _, idx := range candidates[1:] {
+		count := len(ps.musicData.Albums[idx].Songs)
+		if count > bestCount {
+			bestCount = count
+			bestIdx = idx
+		}
+	}
+
+	ps.albumSelected = bestIdx
+	ps.editLoadAlbumData()
+	loadedAlbum := ps.musicData.Albums[ps.albumSelected]
+	debugLog("[LOADED] Album=%q Artist=%q Index=%d UUID=%s Tracks=%d\n",
+		loadedAlbum.Album, loadedAlbum.Artist, ps.albumSelected, loadedAlbum.uuid[:8], len(loadedAlbum.Songs))
 }
 
 func (ps *PlayerState) editFieldCount() int {
@@ -849,6 +1007,12 @@ func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
 	}
 	ti := ps.editTrackIdx(fieldIdx)
 	fi := ps.editTrackFieldIdx(fieldIdx)
+
+	if ti >= len(ps.editTracksOrig) {
+		debugLog("[CRASH] fieldIdx=%d ti=%d but editTracksOrig len=%d\n", fieldIdx, ti, len(ps.editTracksOrig))
+		return
+	}
+
 	switch fi {
 	case 0:
 		ps.editTracksOrig[ti].Track = ps.editTracks[ti].Track
@@ -879,6 +1043,9 @@ func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
 		return ps.finishApply(), ps.tickCmd()
 	}
 
+	// Store old music data before reload
+	oldMusicData := ps.musicData
+
 	// Execute current command
 	cmd := ps.applyQueue[ps.applyProgress]
 	var err error
@@ -887,6 +1054,10 @@ func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
 		err = kid3WriteTags(cmd.srcPath, cmd.tags)
 	case applyOpRename:
 		err = renameOrMerge(cmd.srcPath, cmd.dstPath)
+		// Track directory renames
+		if err == nil && cmd.fieldIdx == 3 {
+			ps.editingCurrentDir = ps.editAlbum[3]
+		}
 	case applyOpStripArt:
 		err = kid3StripPicture(cmd.srcPath)
 	case applyOpCoverInstall:
@@ -909,8 +1080,11 @@ func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
 		return ps, ps.tickCmd()
 	}
 
-	// Reload album edit state with fresh data
-	ps.editLoadAlbum()
+	// Match albums and reassign UUIDs
+	ps.matchAndReassignUUIDs(oldMusicData)
+
+	// Find and load our album by UUID
+	ps.editFindAndLoadAlbumByUUID()
 
 	// Track completed field for orig update
 	completedFieldIdx := cmd.fieldIdx
@@ -936,34 +1110,14 @@ func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
 }
 
 func (ps *PlayerState) finishApply() tea.Model {
-	// Remember the edited album's identifiers (using the NEW values after edits)
-	targetAlbum := ps.editAlbum[0]
-	targetArtist := ps.editAlbum[1]
-
 	ps.applyQueue = nil
 	ps.editFocus = EditFocusAlbums
 	ps.mode = ModeEdit
 
-	// Data already reloaded after last command, just need to find our album
-	// (MPD may have re-sorted the album list)
-	// Find the album we were editing (it might have moved due to re-sorting)
-	foundIdx := -1
-	for i, album := range ps.musicData.Albums {
-		if album.Album == targetAlbum && album.Artist == targetArtist {
-			foundIdx = i
-			break
-		}
-	}
-
-	// Update selection to found album, or clamp to valid range
-	if foundIdx >= 0 {
-		ps.albumSelected = foundIdx
-	} else if ps.albumSelected >= len(ps.musicData.Albums) {
-		ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
-	}
-
+	// Data already matched after last command
+	// Just ensure we're on our album
+	ps.editFindAndLoadAlbumByUUID()
 	ps.editAlbumFixOffset()
-	ps.editLoadAlbum()
 
 	return ps
 }

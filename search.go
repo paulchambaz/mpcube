@@ -40,7 +40,8 @@ func fuzzyScore(query, target string) int {
 	}
 
 	if qi < len(query) {
-		return -1
+		// Partial match: penalize by 50%
+		score = score / 2
 	}
 	return score
 }

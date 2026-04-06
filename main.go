@@ -8,6 +8,8 @@ import (
 )
 
 func main() {
+	os.Remove("/tmp/mpcube-debug.log")
+
 	config, err := LoadConfig()
 	if err != nil {
 		fmt.Printf("Failed to load config: %v\n", err)

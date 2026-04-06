@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -163,6 +164,7 @@ func (ps *PlayerState) doCoverSearch(query string) {
 		ps.editCoverError = err.Error()
 		return
 	}
+	results = sortCoverResultsByScore(results, query)
 	ps.editCoverResults = results
 	ps.editCoverResultIdx = 0
 	ps.editCoverResultOffset = 0
@@ -239,12 +241,37 @@ func fetchReleaseTracks(mbid string) ([]metadataTrack, error) {
 	return tracks, nil
 }
 
+func sortCoverResultsByScore(results []coverResult, query string) []coverResult {
+	type scored struct {
+		idx   int
+		score int
+	}
+
+	var scores []scored
+	for i, r := range results {
+		display := r.artist + " - " + r.title
+		score := fuzzyScore(query, display)
+		scores = append(scores, scored{i, score})
+	}
+
+	sort.Slice(scores, func(i, j int) bool {
+		return scores[i].score > scores[j].score
+	})
+
+	sorted := make([]coverResult, len(results))
+	for i, s := range scores {
+		sorted[i] = results[s.idx]
+	}
+	return sorted
+}
+
 func (ps *PlayerState) doMetadataSearch(query string) {
 	results, err := searchMusicBrainz(query)
 	if err != nil {
 		ps.editMetadataError = err.Error()
 		return
 	}
+	results = sortCoverResultsByScore(results, query)
 	ps.editMetadataResults = results
 	ps.editMetadataResultIdx = 0
 	ps.editMetadataResultOffset = 0

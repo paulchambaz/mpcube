@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fhs/gompd/v2/mpd"
+	"github.com/google/uuid"
 )
 
 type rawEntry struct {
@@ -79,6 +80,10 @@ func LoadMusicData(client *mpd.Client) (*MusicData, error) {
 	sortAlbums(albums)
 	for i := range albums {
 		sortSongs(albums[i].Songs)
+	}
+
+	for i := range albums {
+		albums[i].uuid = uuid.New().String()
 	}
 
 	return &MusicData{Albums: albums}, nil
