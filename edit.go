@@ -321,6 +321,44 @@ func (ps *PlayerState) editFindAndLoadAlbumByUUID() {
 		loadedAlbum.Album, loadedAlbum.Artist, ps.albumSelected, loadedAlbum.uuid[:8], len(loadedAlbum.Songs))
 }
 
+func (ps *PlayerState) editUpdateAlbumSelectedByUUID() {
+	if ps.editingUUID == "" {
+		return
+	}
+
+	var candidates []int
+	for i, album := range ps.musicData.Albums {
+		if album.uuid == ps.editingUUID {
+			candidates = append(candidates, i)
+		}
+	}
+
+	debugLog("[DISPLAY] Found %d candidates for UUID %s\n", len(candidates), ps.editingUUID[:8])
+
+	if len(candidates) == 0 {
+		if ps.albumSelected >= len(ps.musicData.Albums) {
+			ps.albumSelected = max(0, len(ps.musicData.Albums)-1)
+		}
+		return
+	}
+
+	if len(candidates) == 1 {
+		ps.albumSelected = candidates[0]
+		return
+	}
+
+	bestIdx := candidates[0]
+	bestCount := len(ps.musicData.Albums[bestIdx].Songs)
+	for _, idx := range candidates[1:] {
+		count := len(ps.musicData.Albums[idx].Songs)
+		if count > bestCount {
+			bestCount = count
+			bestIdx = idx
+		}
+	}
+	ps.albumSelected = bestIdx
+}
+
 func (ps *PlayerState) editFieldCount() int {
 	return editAlbumFieldCount + len(ps.editTracks)*3
 }
@@ -895,6 +933,9 @@ func (ps *PlayerState) editBuildApplyAll() []applyCmd {
 	for ti := 0; ti < len(ps.editTracks); ti++ {
 		baseIdx := editAlbumFieldCount + ti*3
 		trackDir := ps.editTracksOrig[ti].Dir
+		if ps.editIsModified(3) && trackDir == ps.editAlbumOrig[3] {
+			trackDir = currentDir
+		}
 		trackFile := ps.editTracksOrig[ti].File
 		trackPath := filepath.Join(baseDir, trackDir, trackFile)
 
@@ -988,6 +1029,16 @@ func renameOrMerge(src, dst string) error {
 func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
 	if fieldIdx < editAlbumFieldCount {
 		ps.editAlbumOrig[fieldIdx] = ps.editAlbum[fieldIdx]
+		if fieldIdx == 0 {
+			for i := range ps.editTracks {
+				ps.editTracks[i].Album = ""
+			}
+		}
+		if fieldIdx == 1 {
+			for i := range ps.editTracks {
+				ps.editTracks[i].Artist = ""
+			}
+		}
 		if fieldIdx == 3 {
 			for i := range ps.editTracks {
 				ps.editTracks[i].Dir = ps.editAlbum[3]
@@ -1023,13 +1074,14 @@ func (ps *PlayerState) editApplyUpdateOrig(fieldIdx int) {
 	}
 }
 
-func (ps *PlayerState) editStartApply(cmds []applyCmd) {
+func (ps *PlayerState) editStartApply(cmds []applyCmd, isAll bool) {
 	if len(cmds) == 0 {
 		return
 	}
 	ps.applyQueue = cmds
 	ps.applyProgress = 0
 	ps.applyError = ""
+	ps.applyIsAll = isAll
 	ps.applyReturnFocus = ps.editFocus
 	ps.editFocus = EditFocusCenter
 	ps.editFieldIdx = cmds[0].fieldIdx
@@ -1038,15 +1090,12 @@ func (ps *PlayerState) editStartApply(cmds []applyCmd) {
 }
 
 func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
-	// Safety check
 	if ps.applyProgress >= len(ps.applyQueue) {
 		return ps.finishApply(), ps.tickCmd()
 	}
 
-	// Store old music data before reload
 	oldMusicData := ps.musicData
 
-	// Execute current command
 	cmd := ps.applyQueue[ps.applyProgress]
 	var err error
 	switch cmd.op {
@@ -1054,7 +1103,6 @@ func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
 		err = kid3WriteTags(cmd.srcPath, cmd.tags)
 	case applyOpRename:
 		err = renameOrMerge(cmd.srcPath, cmd.dstPath)
-		// Track directory renames
 		if err == nil && cmd.fieldIdx == 3 {
 			ps.editingCurrentDir = ps.editAlbum[3]
 		}
@@ -1064,15 +1112,20 @@ func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
 		err = copyFile(cmd.srcPath, cmd.dstPath)
 	}
 
-	// Handle error
 	if err != nil {
 		ps.applyError = err.Error()
+		// Best-effort reload for accurate display after partial apply
+		if updateErr := ps.updateAndWait(); updateErr == nil {
+			ps.matchAndReassignUUIDs(oldMusicData)
+			ps.editFindAndLoadAlbumByUUID()
+		}
 		ps.applyQueue = nil
 		ps.mode = ModeEdit
+		ps.editAlbumFixOffset()
 		return ps, ps.tickCmd()
 	}
 
-	// Trigger MPD database update and wait for completion
+	// Sync MPD and reload musicData for display (filesystem ground truth)
 	if err := ps.updateAndWait(); err != nil {
 		ps.applyError = err.Error()
 		ps.applyQueue = nil
@@ -1080,45 +1133,58 @@ func (ps *PlayerState) handleApplyTick() (tea.Model, tea.Cmd) {
 		return ps, ps.tickCmd()
 	}
 
-	// Match albums and reassign UUIDs
+	// Update display state without touching edit intent
 	ps.matchAndReassignUUIDs(oldMusicData)
+	ps.editUpdateAlbumSelectedByUUID()
+	ps.editAlbumFixOffset()
 
-	// Find and load our album by UUID
-	ps.editFindAndLoadAlbumByUUID()
-
-	// Track completed field for orig update
-	completedFieldIdx := cmd.fieldIdx
 	ps.applyProgress++
 
-	// Check if next command is for a different field
-	nextIsNewField := ps.applyProgress >= len(ps.applyQueue) ||
-		ps.applyQueue[ps.applyProgress].fieldIdx != completedFieldIdx
-
-	if nextIsNewField {
-		ps.editApplyUpdateOrig(completedFieldIdx)
-	}
-
-	// Update UI to show next field if not done
 	if ps.applyProgress < len(ps.applyQueue) {
 		ps.editFieldIdx = ps.applyQueue[ps.applyProgress].fieldIdx
 		ps.editFixCenterOffset()
 		return ps, ps.tickCmd()
 	}
 
-	// All done
 	return ps.finishApply(), ps.tickCmd()
 }
 
+func (ps *PlayerState) editUpdateOrigsForCmds(cmds []applyCmd) {
+	applied := make(map[int]bool)
+	for _, cmd := range cmds {
+		applied[cmd.fieldIdx] = true
+		for tagName := range cmd.tags {
+			switch tagName {
+			case "Album":
+				applied[0] = true
+			case "Artist":
+				applied[1] = true
+			case "Date":
+				applied[2] = true
+			}
+		}
+	}
+	for fieldIdx := range applied {
+		ps.editApplyUpdateOrig(fieldIdx)
+	}
+}
+
 func (ps *PlayerState) finishApply() tea.Model {
+	if !ps.applyIsAll {
+		// Single-field apply: update origs for applied fields, preserve other pending edits
+		ps.editUpdateOrigsForCmds(ps.applyQueue)
+	}
+
 	ps.applyQueue = nil
 	ps.editFocus = EditFocusAlbums
 	ps.mode = ModeEdit
 
-	// Data already matched after last command
-	// Just ensure we're on our album
-	ps.editFindAndLoadAlbumByUUID()
-	ps.editAlbumFixOffset()
+	if ps.applyIsAll {
+		// Full reload — all changes applied, no pending edits to preserve
+		ps.editFindAndLoadAlbumByUUID()
+	}
 
+	ps.editAlbumFixOffset()
 	return ps
 }
 

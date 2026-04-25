@@ -105,6 +105,7 @@ type PlayerState struct {
 	applyError       string
 	applyQueue       []applyCmd
 	applyProgress    int
+	applyIsAll       bool
 	applyReturnFocus EditFocus
 }
 

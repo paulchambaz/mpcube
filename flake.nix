@@ -29,7 +29,7 @@
           go
           golangci-lint
           vhs
-          claude-code
+          opencode
         ];
       in
       {
