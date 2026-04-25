@@ -2,6 +2,6 @@
 *.bin
 /mpcube
 .git
-CLAUDE.md
+AGENTS.md
 ROADMAP.md
 mpcube.cfg
